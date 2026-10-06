@@ -27,7 +27,23 @@ jobs:
 
       - name: Build app
         run: |
-          pyinstaller --windowed --name "Konstruktor Wiat 3D" --collect-all streamlit --collect-all plotly launcher.py
+          pyinstaller --noconfirm --clean --windowed \
+            --name "Konstruktor Wiat 3D" \
+            --add-data "app.py:." \
+            --collect-all streamlit \
+            --collect-all plotly \
+            launcher.py
+
+      - name: Verify app contents
+        run: |
+          test -d "dist/Konstruktor Wiat 3D.app"
+          find "dist/Konstruktor Wiat 3D.app" -name "app.py" -print
+          test -n "$(find "dist/Konstruktor Wiat 3D.app" -name "app.py" -print -quit)"
+
+      - name: Ad-hoc sign app
+        run: |
+          codesign --force --deep --sign - "dist/Konstruktor Wiat 3D.app"
+          codesign --verify --deep --strict "dist/Konstruktor Wiat 3D.app"
 
       - name: Package
         run: |
@@ -35,5 +51,5 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Konstruktor-Wiat-3D-macOS
+          name: Konstruktor-Wiat-3D-macOS-v0.2-fixed
           path: Konstruktor-Wiat-3D-macOS.zip
