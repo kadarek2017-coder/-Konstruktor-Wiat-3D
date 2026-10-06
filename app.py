@@ -2,7 +2,7 @@ import json, math
 import streamlit as st
 import plotly.graph_objects as go
 
-VERSION = "0.3"
+VERSION = "0.4"
 st.set_page_config(page_title=f"Konstruktor Wiat 3D v{VERSION}", page_icon="🏗️", layout="wide")
 st.title(f"Konstruktor Wiat 3D v{VERSION}")
 st.caption("Parametryczny model drewnianej wiaty — rzeczywiste przekroje elementów 3D")
@@ -11,8 +11,17 @@ with st.sidebar:
     st.header("Wymiary")
     W=st.number_input("Szerokość [m]",2.0,15.0,7.0,.1)
     L=st.number_input("Długość [m]",2.0,15.0,6.0,.1)
-    Hf=st.number_input("Wysokość przodu [m]",2.0,5.0,3.20,.05)
-    Hb=st.number_input("Wysokość tyłu [m]",2.0,5.0,2.70,.05)
+    roof_type=st.selectbox("Rodzaj dachu",["Jednospadowy","Dwuspadowy","Płaski"])
+    Hf=st.number_input("Wysokość okapu/bazowa [m]",2.0,5.0,3.20,.05)
+    if roof_type=="Jednospadowy":
+        Hb=st.number_input("Wysokość drugiej krawędzi [m]",2.0,5.0,2.70,.05)
+        ridge_h=Hf
+    elif roof_type=="Dwuspadowy":
+        Hb=Hf
+        ridge_h=st.number_input("Wysokość kalenicy [m]",Hf,6.0,max(Hf,3.80),.05)
+    else:
+        Hb=Hf
+        ridge_h=Hf
     nside=st.slider("Słupy na jednym boku",2,6,4)
     st.header("Przekroje")
     pc=st.number_input("Słup [cm]",8,30,20,1)/100
@@ -42,8 +51,15 @@ def box(x0,x1,y0,y1,z0,z1,name,opacity=1.0):
         hovertemplate=f"{name}<extra></extra>", showscale=False
     ))
 
-def roof_h(y):
-    return Hf+(Hb-Hf)*(y/L)
+def roof_h(y, x=None):
+    if roof_type=="Jednospadowy":
+        return Hf+(Hb-Hf)*(y/L)
+    if roof_type=="Płaski":
+        return Hf
+    if x is None:
+        return Hf
+    half=W/2
+    return Hf+(ridge_h-Hf)*(1-abs(x-half)/half)
 
 ys=[i*L/(nside-1) for i in range(nside)]
 # słupy
@@ -68,8 +84,17 @@ for y,h in ((0,Hf),(L,Hb)):
 rn=max(2,math.ceil(L/spacing)+1)
 rys=[i*L/(rn-1) for i in range(rn)]
 for i,y in enumerate(rys,1):
-    h=roof_h(y)
-    box(-overhang,W+overhang,y-rw/2,y+rw/2,h,h+rh,f"K{i}")
+    if roof_type=="Dwuspadowy":
+        segs=max(12,int(W/.25))
+        for s in range(segs):
+            x0=-overhang+(W+2*overhang)*s/segs
+            x1=-overhang+(W+2*overhang)*(s+1)/segs
+            xm=max(0,min(W,(x0+x1)/2))
+            h=roof_h(y,xm)
+            box(x0,x1,y-rw/2,y+rw/2,h,h+rh,f"K{i}")
+    else:
+        h=roof_h(y)
+        box(-overhang,W+overhang,y-rw/2,y+rw/2,h,h+rh,f"K{i}")
 
 # zastrzały — wizualizowane jako grube elementy ukośne
 if braces:
@@ -108,8 +133,13 @@ with c1:
     st.plotly_chart(fig,use_container_width=True)
 with c2:
     st.subheader("Parametry")
-    pct=(Hf-Hb)/L*100
-    deg=math.degrees(math.atan((Hf-Hb)/L))
+    if roof_type=="Jednospadowy":
+        pct=(Hf-Hb)/L*100; deg=math.degrees(math.atan((Hf-Hb)/L))
+    elif roof_type=="Dwuspadowy":
+        pct=(ridge_h-Hf)/(W/2)*100; deg=math.degrees(math.atan((ridge_h-Hf)/(W/2)))
+    else:
+        pct=0.0; deg=0.0
+    st.metric("Dach",roof_type)
     st.metric("Słupy",2*nside)
     st.metric("Krokwie",rn)
     st.metric("Zastrzały",6 if braces else 0)
@@ -128,10 +158,10 @@ rows=[
 ]
 st.dataframe(rows,use_container_width=True,hide_index=True)
 
-project={"version":VERSION,"width_m":W,"length_m":L,"front_height_m":Hf,"back_height_m":Hb,
+project={"version":VERSION,"roof_type":roof_type,"ridge_height_m":ridge_h,"width_m":W,"length_m":L,"front_height_m":Hf,"back_height_m":Hb,
 "posts_per_side":nside,"post_cm":pc*100,"beam_cm":[bw*100,bh*100],
 "rafter_cm":[rw*100,rh*100],"rafter_spacing_m":spacing,"overhang_m":overhang,
 "braces":braces,"brace_length_m":brace_len}
 st.download_button("💾 Zapisz projekt",json.dumps(project,indent=2,ensure_ascii=False),
-                   "wiata-v0.3.json","application/json")
+                   "wiata-v0.4.json","application/json")
 st.warning("Model służy do projektowania geometrii i zestawienia materiału. Nie zastępuje obliczeń konstrukcyjnych.")
