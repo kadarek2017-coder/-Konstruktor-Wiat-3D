@@ -1,0 +1,39 @@
+name: Build macOS app
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - "app.py"
+      - "requirements.txt"
+      - "launcher.py"
+      - ".github/workflows/build-macos.yml"
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Build app
+        run: |
+          pyinstaller --windowed --name "Konstruktor Wiat 3D" --collect-all streamlit --collect-all plotly launcher.py
+
+      - name: Package
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent "dist/Konstruktor Wiat 3D.app" "Konstruktor-Wiat-3D-macOS.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Konstruktor-Wiat-3D-macOS
+          path: Konstruktor-Wiat-3D-macOS.zip
