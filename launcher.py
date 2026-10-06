@@ -45,6 +45,7 @@ try:
     from streamlit.web import cli as stcli
     sys.argv=[
         "streamlit","run",app,
+        "--global.developmentMode","false",
         "--server.port",str(port),
         "--server.address","127.0.0.1",
         "--server.headless","true",
