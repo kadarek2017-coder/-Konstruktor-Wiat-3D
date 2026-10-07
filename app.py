@@ -3,7 +3,7 @@ import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
 
-VERSION = "0.7.2"
+VERSION = "0.8"
 st.set_page_config(page_title=f"Konstruktor Wiat 3D v{VERSION}", page_icon="🏗️", layout="wide", initial_sidebar_state="collapsed")
 st.title(f"Konstruktor Wiat 3D v{VERSION}")
 st.caption("Parametryczny model drewnianej wiaty + ręczna biblioteka elementów 3D")
@@ -12,6 +12,7 @@ ELEMENT_LIBRARY={"Słup":{"a":.20,"b":.20,"length":3.0,"dir":"Z"},"Belka":{"a":.
 WOOD_COLORS={"Świerk":"#C9A66B","Sosna":"#D2AE72","Modrzew":"#B77945","Dąb":"#9B6B3E","KVH":"#D0A66A","BSH":"#B98550"}
 FINISH_COLORS={"Surowe":None,"Olej naturalny":"#A97845","Impregnat jasny":"#B88958","Impregnat ciemny":"#6F4A2F","Biały":"#E7E3D8","Grafit":"#55575A"}
 if "custom_elements" not in st.session_state: st.session_state.custom_elements=[]
+if "style_overrides" not in st.session_state: st.session_state.style_overrides={}
 
 with st.sidebar:
     st.header("Wymiary")
@@ -47,6 +48,40 @@ with st.sidebar:
     base_wood=st.selectbox("Drewno konstrukcji",list(WOOD_COLORS.keys()),index=0)
     base_finish=st.selectbox("Wykończenie konstrukcji",list(FINISH_COLORS.keys()),index=0)
     base_wood_color=FINISH_COLORS.get(base_finish) or WOOD_COLORS[base_wood]
+    st.caption("Domyślny wygląd całej konstrukcji. Wybrane elementy można nadpisać niżej.")
+
+# Edycja wyglądu pojedynczych elementów i grup
+with st.expander("🎨 Kolorowanie elementów / grup", expanded=False):
+    style_scope=st.radio("Zakres",["Grupa elementów","Pojedynczy element"],horizontal=True)
+    group_options=["Słupy","Belki","Krokwie","Zastrzały"]
+    if style_scope=="Grupa elementów":
+        style_target=st.selectbox("Wybierz grupę",group_options)
+        style_key=f"group:{style_target}"
+    else:
+        single_options=[f"S{i}" for i in range(1,len(posts)+1)] if "posts" in locals() else []
+        single_options += [f"K{i}" for i in range(1,30)]
+        single_options += [f"R{el['id']} — {el['type']}" for el in st.session_state.custom_elements]
+        style_target=st.selectbox("Wybierz element",single_options or ["Brak elementów"])
+        style_key=f"single:{style_target.split(' — ')[0]}"
+    sc1,sc2=st.columns(2)
+    with sc1: style_wood=st.selectbox("Drewno",list(WOOD_COLORS.keys()),key="stylewood")
+    with sc2: style_finish=st.selectbox("Wykończenie",list(FINISH_COLORS.keys()),key="stylefinish")
+    if st.button("Zastosuj wygląd"):
+        st.session_state.style_overrides[style_key]={"wood":style_wood,"finish":style_finish}
+        st.rerun()
+    if st.button("Przywróć wygląd domyślny"):
+        st.session_state.style_overrides.pop(style_key,None)
+        st.rerun()
+
+def style_color(group, element_id=None):
+    data=None
+    if element_id:
+        data=st.session_state.style_overrides.get(f"single:{element_id}")
+    if data is None:
+        data=st.session_state.style_overrides.get(f"group:{group}")
+    if data is None:
+        return base_wood_color
+    return FINISH_COLORS.get(data["finish"]) or WOOD_COLORS.get(data["wood"],base_wood_color)
 
 # Edytowalna lista słupów
 auto_ys=[i*L/(nside-1) for i in range(nside)]
@@ -130,7 +165,7 @@ for j,p in enumerate(posts,1):
     x=max(0.0,min(W,p["X [m]"]))
     y=max(0.0,min(L,p["Y [m]"]))
     h=roof_h(y,x)-bh
-    box(x-pc/2,x+pc/2,y-pc/2,y+pc/2,0,h,f"S{j}",color=base_wood_color)
+    box(x-pc/2,x+pc/2,y-pc/2,y+pc/2,0,h,f"S{j}",color=style_color("Słupy",f"S{j}"))
 
 # belki podłużne, podążające za spadkiem — dzielone na segmenty dla poprawnej geometrii
 segments=max(12,int(L/.25))
@@ -138,11 +173,11 @@ for x in (0,W):
     for s in range(segments):
         y0=L*s/segments; y1=L*(s+1)/segments
         z0=roof_h((y0+y1)/2)-bh
-        box(x-bw/2,x+bw/2,y0,y1,z0,z0+bh,"Belka podłużna",color=base_wood_color)
+        box(x-bw/2,x+bw/2,y0,y1,z0,z0+bh,"Belka podłużna",color=style_color("Belki"))
 
 # belki czołowa i tylna
 for y,h in ((0,Hf),(L,Hb)):
-    box(-pc/2,W+pc/2,y-bw/2,y+bw/2,h-bh,h,"Belka poprzeczna",color=base_wood_color)
+    box(-pc/2,W+pc/2,y-bw/2,y+bw/2,h-bh,h,"Belka poprzeczna",color=style_color("Belki"))
 
 # krokwie — kierunek wybierany przez użytkownika
 if rafter_direction=="W poprzek (X)":
@@ -156,7 +191,7 @@ if rafter_direction=="W poprzek (X)":
                 x1=-overhang+(W+2*overhang)*(s+1)/segs
                 xm=max(0,min(W,(x0+x1)/2))
                 h=roof_h(y,xm)
-                box(x0,x1,y-rw/2,y+rw/2,h,h+rh,f"K{i}",color=base_wood_color)
+                box(x0,x1,y-rw/2,y+rw/2,h,h+rh,f"K{i}",color=style_color("Krokwie",f"K{i}"))
         else:
             h=roof_h(y)
             box(-overhang,W+overhang,y-rw/2,y+rw/2,h,h+rh,f"K{i}",color=base_wood_color)
@@ -179,7 +214,7 @@ if braces:
     def member(x1,y1,z1,x2,y2,z2,name,width=9):
         fig.add_trace(go.Scatter3d(
             x=[x1,x2],y=[y1,y2],z=[z1,z2],mode="lines",
-            line=dict(width=width,color=base_wood_color),name=name,
+            line=dict(width=width,color=style_color("Zastrzały")),name=name,
             hovertemplate=f"{name}<extra></extra>",showlegend=False
         ))
     b=min(brace_len,L/3)
@@ -200,6 +235,9 @@ for el in st.session_state.custom_elements:
     if el["type"] in ["Blacha dachowa","Stopa / kotwa"]:
         elcolor="#8B9198"
     else:
+        override=st.session_state.style_overrides.get(f'single:R{el["id"]}')
+        if override:
+            mat=override["wood"]; fin=override["finish"]
         elcolor=FINISH_COLORS.get(fin) or WOOD_COLORS.get(mat,"#C9A66B")
     if el["direction"]=="X": box(x,x+ln,y-a/2,y+a/2,z,z+b,f'{el["type"]} R{el["id"]} — {mat}',color=elcolor)
     elif el["direction"]=="Y": box(x-a/2,x+a/2,y,y+ln,z,z+b,f'{el["type"]} R{el["id"]} — {mat}',color=elcolor)
@@ -252,7 +290,7 @@ st.dataframe(rows,use_container_width=True,hide_index=True)
 project={"version":VERSION,"roof_type":roof_type,"ridge_height_m":ridge_h,"width_m":W,"length_m":L,"front_height_m":Hf,"back_height_m":Hb,
 "posts_per_side":nside,"post_mode":post_mode,"posts":posts,"rafter_direction":rafter_direction,"post_cm":pc*100,"beam_cm":[bw*100,bh*100],
 "rafter_cm":[rw*100,rh*100],"rafter_spacing_m":spacing,"overhang_m":overhang,
-"braces":braces,"brace_length_m":brace_len,"wood_material":base_wood,"wood_finish":base_finish,"custom_elements":st.session_state.custom_elements}
+"braces":braces,"brace_length_m":brace_len,"wood_material":base_wood,"wood_finish":base_finish,"style_overrides":st.session_state.style_overrides,"custom_elements":st.session_state.custom_elements}
 st.download_button("💾 Zapisz projekt",json.dumps(project,indent=2,ensure_ascii=False),
-                   "wiata-v0.7.2.json","application/json")
+                   "wiata-v0.8.json","application/json")
 st.warning("Model służy do projektowania geometrii i zestawienia materiału. Nie zastępuje obliczeń konstrukcyjnych.")
