@@ -3,7 +3,7 @@ import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
 
-VERSION = "0.8"
+VERSION = "0.9"
 st.set_page_config(page_title=f"Konstruktor Wiat 3D v{VERSION}", page_icon="🏗️", layout="wide", initial_sidebar_state="collapsed")
 st.title(f"Konstruktor Wiat 3D v{VERSION}")
 st.caption("Parametryczny model drewnianej wiaty + ręczna biblioteka elementów 3D")
@@ -131,7 +131,11 @@ if st.button("➕ Dodaj element do konstrukcji"):
     st.session_state.custom_elements.append({"id":len(st.session_state.custom_elements)+1,"type":element_type,"x":ex,"y":ey,"z":ez,"a":ea,"b":eb,"length":elen,"direction":direction,"material":material,"finish":finish})
     st.rerun()
 if st.session_state.custom_elements:
-    st.dataframe(pd.DataFrame(st.session_state.custom_elements),use_container_width=True,hide_index=True)
+    edited_custom=st.data_editor(pd.DataFrame(st.session_state.custom_elements),use_container_width=True,hide_index=True,
+        disabled=["id","type","material","finish"],key="custom_editor")
+    if st.button("💾 Zastosuj zmiany elementów"):
+        st.session_state.custom_elements=edited_custom.to_dict("records")
+        st.rerun()
     if st.button("🗑️ Usuń ostatni element"):
         st.session_state.custom_elements.pop(); st.rerun()
 
@@ -275,6 +279,24 @@ with c2:
     st.metric("Spadek",f"{pct:.1f}% / {deg:.1f}°")
     st.metric("Powierzchnia",f"{W*L:.1f} m²")
 
+st.subheader("📐 Rzut 2D z góry")
+st.caption("S = słupy, R = elementy dodane ręcznie. Rzut aktualizuje się razem z modelem 3D.")
+plan=go.Figure()
+plan.add_shape(type="rect",x0=0,y0=0,x1=W,y1=L,line=dict(width=2))
+for j,p in enumerate(posts,1):
+    px=float(p["X [m]"]); py=float(p["Y [m]"])
+    plan.add_trace(go.Scatter(x=[px],y=[py],mode="markers+text",text=[f"S{j}"],textposition="top center",
+        marker=dict(size=13),hovertemplate=f"S{j}<br>X={px:.2f} m<br>Y={py:.2f} m<extra></extra>"))
+for el in st.session_state.custom_elements:
+    px=float(el["x"]); py=float(el["y"])
+    label=f'R{el["id"]}'
+    plan.add_trace(go.Scatter(x=[px],y=[py],mode="markers+text",text=[label],textposition="bottom center",
+        marker=dict(size=11,symbol="square"),hovertemplate=f'{label} — {el["type"]}<br>X={px:.2f} m<br>Y={py:.2f} m<extra></extra>'))
+plan.update_xaxes(title="X — szerokość [m]",range=[-.5,W+.5],scaleanchor="y",scaleratio=1)
+plan.update_yaxes(title="Y — długość [m]",range=[-.5,L+.5])
+plan.update_layout(height=620,margin=dict(l=10,r=10,t=10,b=10),showlegend=False)
+st.plotly_chart(plan,use_container_width=True)
+
 st.subheader("Zestawienie elementów")
 if st.session_state.custom_elements: st.info(f"Ręcznie dodane elementy: {len(st.session_state.custom_elements)}")
 post_lengths=[roof_h(p["Y [m]"],p["X [m]"])-bh for p in posts] if posts else [0]
@@ -292,5 +314,5 @@ project={"version":VERSION,"roof_type":roof_type,"ridge_height_m":ridge_h,"width
 "rafter_cm":[rw*100,rh*100],"rafter_spacing_m":spacing,"overhang_m":overhang,
 "braces":braces,"brace_length_m":brace_len,"wood_material":base_wood,"wood_finish":base_finish,"style_overrides":st.session_state.style_overrides,"custom_elements":st.session_state.custom_elements}
 st.download_button("💾 Zapisz projekt",json.dumps(project,indent=2,ensure_ascii=False),
-                   "wiata-v0.8.json","application/json")
+                   "wiata-v0.9.json","application/json")
 st.warning("Model służy do projektowania geometrii i zestawienia materiału. Nie zastępuje obliczeń konstrukcyjnych.")
