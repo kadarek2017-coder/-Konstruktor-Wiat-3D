@@ -3,7 +3,7 @@ import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
 
-VERSION = "0.7.1"
+VERSION = "0.7.2"
 st.set_page_config(page_title=f"Konstruktor Wiat 3D v{VERSION}", page_icon="🏗️", layout="wide", initial_sidebar_state="collapsed")
 st.title(f"Konstruktor Wiat 3D v{VERSION}")
 st.caption("Parametryczny model drewnianej wiaty + ręczna biblioteka elementów 3D")
@@ -43,6 +43,10 @@ with st.sidebar:
     braces=st.checkbox("Zastrzały",True)
     brace_len=st.number_input("Długość zastrzału [m]",0.40,1.50,.80,.05)
     show_ground=st.checkbox("Pokaż podłoże",True)
+    st.header("Wygląd konstrukcji")
+    base_wood=st.selectbox("Drewno konstrukcji",list(WOOD_COLORS.keys()),index=0)
+    base_finish=st.selectbox("Wykończenie konstrukcji",list(FINISH_COLORS.keys()),index=0)
+    base_wood_color=FINISH_COLORS.get(base_finish) or WOOD_COLORS[base_wood]
 
 # Edytowalna lista słupów
 auto_ys=[i*L/(nside-1) for i in range(nside)]
@@ -126,7 +130,7 @@ for j,p in enumerate(posts,1):
     x=max(0.0,min(W,p["X [m]"]))
     y=max(0.0,min(L,p["Y [m]"]))
     h=roof_h(y,x)-bh
-    box(x-pc/2,x+pc/2,y-pc/2,y+pc/2,0,h,f"S{j}")
+    box(x-pc/2,x+pc/2,y-pc/2,y+pc/2,0,h,f"S{j}",color=base_wood_color)
 
 # belki podłużne, podążające za spadkiem — dzielone na segmenty dla poprawnej geometrii
 segments=max(12,int(L/.25))
@@ -134,11 +138,11 @@ for x in (0,W):
     for s in range(segments):
         y0=L*s/segments; y1=L*(s+1)/segments
         z0=roof_h((y0+y1)/2)-bh
-        box(x-bw/2,x+bw/2,y0,y1,z0,z0+bh,"Belka podłużna")
+        box(x-bw/2,x+bw/2,y0,y1,z0,z0+bh,"Belka podłużna",color=base_wood_color)
 
 # belki czołowa i tylna
 for y,h in ((0,Hf),(L,Hb)):
-    box(-pc/2,W+pc/2,y-bw/2,y+bw/2,h-bh,h,"Belka poprzeczna")
+    box(-pc/2,W+pc/2,y-bw/2,y+bw/2,h-bh,h,"Belka poprzeczna",color=base_wood_color)
 
 # krokwie — kierunek wybierany przez użytkownika
 if rafter_direction=="W poprzek (X)":
@@ -152,10 +156,10 @@ if rafter_direction=="W poprzek (X)":
                 x1=-overhang+(W+2*overhang)*(s+1)/segs
                 xm=max(0,min(W,(x0+x1)/2))
                 h=roof_h(y,xm)
-                box(x0,x1,y-rw/2,y+rw/2,h,h+rh,f"K{i}")
+                box(x0,x1,y-rw/2,y+rw/2,h,h+rh,f"K{i}",color=base_wood_color)
         else:
             h=roof_h(y)
-            box(-overhang,W+overhang,y-rw/2,y+rw/2,h,h+rh,f"K{i}")
+            box(-overhang,W+overhang,y-rw/2,y+rw/2,h,h+rh,f"K{i}",color=base_wood_color)
     rafter_len=W+2*overhang
 else:
     rn=max(2,math.ceil(W/spacing)+1)
@@ -167,7 +171,7 @@ else:
             y1=-overhang+(L+2*overhang)*(s+1)/segs
             ym=max(0,min(L,(y0+y1)/2))
             h=roof_h(ym,x)
-            box(x-rw/2,x+rw/2,y0,y1,h,h+rh,f"K{i}")
+            box(x-rw/2,x+rw/2,y0,y1,h,h+rh,f"K{i}",color=base_wood_color)
     rafter_len=L+2*overhang
 
 # zastrzały — wizualizowane jako grube elementy ukośne
@@ -175,7 +179,7 @@ if braces:
     def member(x1,y1,z1,x2,y2,z2,name,width=9):
         fig.add_trace(go.Scatter3d(
             x=[x1,x2],y=[y1,y2],z=[z1,z2],mode="lines",
-            line=dict(width=width),name=name,
+            line=dict(width=width,color=base_wood_color),name=name,
             hovertemplate=f"{name}<extra></extra>",showlegend=False
         ))
     b=min(brace_len,L/3)
@@ -248,7 +252,7 @@ st.dataframe(rows,use_container_width=True,hide_index=True)
 project={"version":VERSION,"roof_type":roof_type,"ridge_height_m":ridge_h,"width_m":W,"length_m":L,"front_height_m":Hf,"back_height_m":Hb,
 "posts_per_side":nside,"post_mode":post_mode,"posts":posts,"rafter_direction":rafter_direction,"post_cm":pc*100,"beam_cm":[bw*100,bh*100],
 "rafter_cm":[rw*100,rh*100],"rafter_spacing_m":spacing,"overhang_m":overhang,
-"braces":braces,"brace_length_m":brace_len,"custom_elements":st.session_state.custom_elements}
+"braces":braces,"brace_length_m":brace_len,"wood_material":base_wood,"wood_finish":base_finish,"custom_elements":st.session_state.custom_elements}
 st.download_button("💾 Zapisz projekt",json.dumps(project,indent=2,ensure_ascii=False),
-                   "wiata-v0.7.1.json","application/json")
+                   "wiata-v0.7.2.json","application/json")
 st.warning("Model służy do projektowania geometrii i zestawienia materiału. Nie zastępuje obliczeń konstrukcyjnych.")
