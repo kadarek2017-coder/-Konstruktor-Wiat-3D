@@ -3,10 +3,13 @@ import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
 
-VERSION = "0.5"
+VERSION = "0.6"
 st.set_page_config(page_title=f"Konstruktor Wiat 3D v{VERSION}", page_icon="🏗️", layout="wide")
 st.title(f"Konstruktor Wiat 3D v{VERSION}")
-st.caption("Parametryczny model drewnianej wiaty — rzeczywiste przekroje elementów 3D")
+st.caption("Parametryczny model drewnianej wiaty + ręczna biblioteka elementów 3D")
+
+ELEMENT_LIBRARY={"Słup":{"a":.20,"b":.20,"length":3.0,"dir":"Z"},"Belka":{"a":.10,"b":.20,"length":3.0,"dir":"X"},"Krokiew":{"a":.08,"b":.18,"length":4.0,"dir":"X"},"Płatew":{"a":.10,"b":.20,"length":3.0,"dir":"Y"},"Łata":{"a":.04,"b":.06,"length":3.0,"dir":"X"},"Zastrzał":{"a":.08,"b":.08,"length":.8,"dir":"X"},"Blacha dachowa":{"a":1.10,"b":.005,"length":3.0,"dir":"Y"},"Stopa / kotwa":{"a":.20,"b":.20,"length":.20,"dir":"Z"}}
+if "custom_elements" not in st.session_state: st.session_state.custom_elements=[]
 
 with st.sidebar:
     st.header("Wymiary")
@@ -62,6 +65,26 @@ if post_mode=="Ręczne":
     st.session_state.manual_posts=posts
 else:
     posts=auto_posts
+
+st.subheader("🧰 Biblioteka elementów")
+element_type=st.selectbox("Element do dodania",list(ELEMENT_LIBRARY.keys()))
+preset=ELEMENT_LIBRARY[element_type]
+p1,p2,p3=st.columns(3)
+with p1: ex=st.number_input("X elementu [m]",0.0,float(W),0.0,.1)
+with p2: ey=st.number_input("Y elementu [m]",0.0,float(L),0.0,.1)
+with p3: ez=st.number_input("Z elementu [m]",0.0,8.0,0.0,.1)
+q1,q2,q3,q4=st.columns(4)
+with q1: direction=st.selectbox("Kierunek",["X","Y","Z"],index=["X","Y","Z"].index(preset["dir"]))
+with q2: ea=st.number_input("A [m]",.005,2.0,float(preset["a"]),.01,key="ea")
+with q3: eb=st.number_input("B [m]",.005,2.0,float(preset["b"]),.01,key="eb")
+with q4: elen=st.number_input("Długość [m]",.05,15.0,float(preset["length"]),.05,key="elen")
+if st.button("➕ Dodaj element do konstrukcji"):
+    st.session_state.custom_elements.append({"id":len(st.session_state.custom_elements)+1,"type":element_type,"x":ex,"y":ey,"z":ez,"a":ea,"b":eb,"length":elen,"direction":direction})
+    st.rerun()
+if st.session_state.custom_elements:
+    st.dataframe(pd.DataFrame(st.session_state.custom_elements),use_container_width=True,hide_index=True)
+    if st.button("🗑️ Usuń ostatni element"):
+        st.session_state.custom_elements.pop(); st.rerun()
 
 fig=go.Figure()
 
@@ -155,6 +178,13 @@ if braces:
     member(0,0,Hf-bh-bx,bx,0,Hf-bh,"Zastrzał")
     member(W,0,Hf-bh-bx,W-bx,0,Hf-bh,"Zastrzał")
 
+# elementy ręczne z biblioteki
+for el in st.session_state.custom_elements:
+    x,y,z,a,b,ln=el["x"],el["y"],el["z"],el["a"],el["b"],el["length"]
+    if el["direction"]=="X": box(x,x+ln,y-a/2,y+a/2,z,z+b,f'{el["type"]} R{el["id"]}')
+    elif el["direction"]=="Y": box(x-a/2,x+a/2,y,y+ln,z,z+b,f'{el["type"]} R{el["id"]}')
+    else: box(x-a/2,x+a/2,y-b/2,y+b/2,z,z+ln,f'{el["type"]} R{el["id"]}')
+
 # podłoże
 if show_ground:
     box(-.35,W+.35,-.35,L+.35,-.035,0,"Podłoże",.12)
@@ -188,6 +218,7 @@ with c2:
     st.metric("Powierzchnia",f"{W*L:.1f} m²")
 
 st.subheader("Zestawienie elementów")
+if st.session_state.custom_elements: st.info(f"Ręcznie dodane elementy: {len(st.session_state.custom_elements)}")
 post_lengths=[roof_h(p["Y [m]"],p["X [m]"])-bh for p in posts] if posts else [0]
 rows=[
  {"Element":"Słupy","Ilość":len(posts),"Przekrój":f"{pc*100:.0f}×{pc*100:.0f} cm","Długość":f"{min(post_lengths):.2f}–{max(post_lengths):.2f} m"},
@@ -201,7 +232,7 @@ st.dataframe(rows,use_container_width=True,hide_index=True)
 project={"version":VERSION,"roof_type":roof_type,"ridge_height_m":ridge_h,"width_m":W,"length_m":L,"front_height_m":Hf,"back_height_m":Hb,
 "posts_per_side":nside,"post_mode":post_mode,"posts":posts,"rafter_direction":rafter_direction,"post_cm":pc*100,"beam_cm":[bw*100,bh*100],
 "rafter_cm":[rw*100,rh*100],"rafter_spacing_m":spacing,"overhang_m":overhang,
-"braces":braces,"brace_length_m":brace_len}
+"braces":braces,"brace_length_m":brace_len,"custom_elements":st.session_state.custom_elements}
 st.download_button("💾 Zapisz projekt",json.dumps(project,indent=2,ensure_ascii=False),
-                   "wiata-v0.5.json","application/json")
+                   "wiata-v0.6.json","application/json")
 st.warning("Model służy do projektowania geometrii i zestawienia materiału. Nie zastępuje obliczeń konstrukcyjnych.")
