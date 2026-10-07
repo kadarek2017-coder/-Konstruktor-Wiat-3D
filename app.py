@@ -1,8 +1,9 @@
 import json, math
+import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
 
-VERSION = "0.4"
+VERSION = "0.5"
 st.set_page_config(page_title=f"Konstruktor Wiat 3D v{VERSION}", page_icon="🏗️", layout="wide")
 st.title(f"Konstruktor Wiat 3D v{VERSION}")
 st.caption("Parametryczny model drewnianej wiaty — rzeczywiste przekroje elementów 3D")
@@ -22,7 +23,9 @@ with st.sidebar:
     else:
         Hb=Hf
         ridge_h=Hf
-    nside=st.slider("Słupy na jednym boku",2,6,4)
+    nside=st.slider("Słupy na jednym boku (tryb automatyczny)",2,6,4)
+    post_mode=st.radio("Rozmieszczenie słupów",["Automatyczne","Ręczne"],horizontal=True)
+    rafter_direction=st.radio("Kierunek krokwi",["W poprzek (X)","Wzdłuż (Y)"],horizontal=False)
     st.header("Przekroje")
     pc=st.number_input("Słup [cm]",8,30,20,1)/100
     bw=st.number_input("Belka — szerokość [cm]",5,30,10,1)/100
@@ -35,6 +38,30 @@ with st.sidebar:
     braces=st.checkbox("Zastrzały",True)
     brace_len=st.number_input("Długość zastrzału [m]",0.40,1.50,.80,.05)
     show_ground=st.checkbox("Pokaż podłoże",True)
+
+# Edytowalna lista słupów
+auto_ys=[i*L/(nside-1) for i in range(nside)]
+auto_posts=[{"X [m]":x,"Y [m]":y} for x in (0.0,W) for y in auto_ys]
+if "manual_posts" not in st.session_state:
+    st.session_state.manual_posts=auto_posts
+
+if post_mode=="Ręczne":
+    st.subheader("Rozmieszczenie słupów")
+    st.caption("Dodawaj i usuwaj wiersze. X = pozycja po szerokości, Y = pozycja po długości.")
+    edited=st.data_editor(
+        pd.DataFrame(st.session_state.manual_posts),
+        num_rows="dynamic", use_container_width=True,
+        column_config={
+            "X [m]":st.column_config.NumberColumn(min_value=0.0,max_value=float(W),step=0.1),
+            "Y [m]":st.column_config.NumberColumn(min_value=0.0,max_value=float(L),step=0.1),
+        },
+        key="posts_editor"
+    )
+    posts=[{"X [m]":float(r["X [m]"]),"Y [m]":float(r["Y [m]"])}
+           for _,r in edited.dropna().iterrows()]
+    st.session_state.manual_posts=posts
+else:
+    posts=auto_posts
 
 fig=go.Figure()
 
@@ -61,12 +88,12 @@ def roof_h(y, x=None):
     half=W/2
     return Hf+(ridge_h-Hf)*(1-abs(x-half)/half)
 
-ys=[i*L/(nside-1) for i in range(nside)]
 # słupy
-for side,x in enumerate((0,W),1):
-    for j,y in enumerate(ys,1):
-        h=roof_h(y)-bh
-        box(x-pc/2,x+pc/2,y-pc/2,y+pc/2,0,h,f"S{side}.{j}")
+for j,p in enumerate(posts,1):
+    x=max(0.0,min(W,p["X [m]"]))
+    y=max(0.0,min(L,p["Y [m]"]))
+    h=roof_h(y,x)-bh
+    box(x-pc/2,x+pc/2,y-pc/2,y+pc/2,0,h,f"S{j}")
 
 # belki podłużne, podążające za spadkiem — dzielone na segmenty dla poprawnej geometrii
 segments=max(12,int(L/.25))
@@ -80,21 +107,35 @@ for x in (0,W):
 for y,h in ((0,Hf),(L,Hb)):
     box(-pc/2,W+pc/2,y-bw/2,y+bw/2,h-bh,h,"Belka poprzeczna")
 
-# krokwie — poziomo w poprzek szerokości, na wysokości wynikającej ze spadku wzdłuż długości
-rn=max(2,math.ceil(L/spacing)+1)
-rys=[i*L/(rn-1) for i in range(rn)]
-for i,y in enumerate(rys,1):
-    if roof_type=="Dwuspadowy":
-        segs=max(12,int(W/.25))
+# krokwie — kierunek wybierany przez użytkownika
+if rafter_direction=="W poprzek (X)":
+    rn=max(2,math.ceil(L/spacing)+1)
+    positions=[i*L/(rn-1) for i in range(rn)]
+    for i,y in enumerate(positions,1):
+        if roof_type=="Dwuspadowy":
+            segs=max(12,int(W/.25))
+            for s in range(segs):
+                x0=-overhang+(W+2*overhang)*s/segs
+                x1=-overhang+(W+2*overhang)*(s+1)/segs
+                xm=max(0,min(W,(x0+x1)/2))
+                h=roof_h(y,xm)
+                box(x0,x1,y-rw/2,y+rw/2,h,h+rh,f"K{i}")
+        else:
+            h=roof_h(y)
+            box(-overhang,W+overhang,y-rw/2,y+rw/2,h,h+rh,f"K{i}")
+    rafter_len=W+2*overhang
+else:
+    rn=max(2,math.ceil(W/spacing)+1)
+    positions=[i*W/(rn-1) for i in range(rn)]
+    for i,x in enumerate(positions,1):
+        segs=max(12,int(L/.25))
         for s in range(segs):
-            x0=-overhang+(W+2*overhang)*s/segs
-            x1=-overhang+(W+2*overhang)*(s+1)/segs
-            xm=max(0,min(W,(x0+x1)/2))
-            h=roof_h(y,xm)
-            box(x0,x1,y-rw/2,y+rw/2,h,h+rh,f"K{i}")
-    else:
-        h=roof_h(y)
-        box(-overhang,W+overhang,y-rw/2,y+rw/2,h,h+rh,f"K{i}")
+            y0=-overhang+(L+2*overhang)*s/segs
+            y1=-overhang+(L+2*overhang)*(s+1)/segs
+            ym=max(0,min(L,(y0+y1)/2))
+            h=roof_h(ym,x)
+            box(x-rw/2,x+rw/2,y0,y1,h,h+rh,f"K{i}")
+    rafter_len=L+2*overhang
 
 # zastrzały — wizualizowane jako grube elementy ukośne
 if braces:
@@ -140,17 +181,16 @@ with c2:
     else:
         pct=0.0; deg=0.0
     st.metric("Dach",roof_type)
-    st.metric("Słupy",2*nside)
+    st.metric("Słupy",len(posts))
     st.metric("Krokwie",rn)
     st.metric("Zastrzały",6 if braces else 0)
     st.metric("Spadek",f"{pct:.1f}% / {deg:.1f}°")
     st.metric("Powierzchnia",f"{W*L:.1f} m²")
 
 st.subheader("Zestawienie elementów")
-post_lengths=[roof_h(y)-bh for _ in (0,W) for y in ys]
-rafter_len=W+2*overhang
+post_lengths=[roof_h(p["Y [m]"],p["X [m]"])-bh for p in posts] if posts else [0]
 rows=[
- {"Element":"Słupy","Ilość":2*nside,"Przekrój":f"{pc*100:.0f}×{pc*100:.0f} cm","Długość":f"{min(post_lengths):.2f}–{max(post_lengths):.2f} m"},
+ {"Element":"Słupy","Ilość":len(posts),"Przekrój":f"{pc*100:.0f}×{pc*100:.0f} cm","Długość":f"{min(post_lengths):.2f}–{max(post_lengths):.2f} m"},
  {"Element":"Belki podłużne","Ilość":2,"Przekrój":f"{bw*100:.0f}×{bh*100:.0f} cm","Długość":f"{L:.2f} m"},
  {"Element":"Belki poprzeczne","Ilość":2,"Przekrój":f"{bw*100:.0f}×{bh*100:.0f} cm","Długość":f"{W+pc:.2f} m"},
  {"Element":"Krokwie","Ilość":rn,"Przekrój":f"{rw*100:.0f}×{rh*100:.0f} cm","Długość":f"{rafter_len:.2f} m"},
@@ -159,9 +199,9 @@ rows=[
 st.dataframe(rows,use_container_width=True,hide_index=True)
 
 project={"version":VERSION,"roof_type":roof_type,"ridge_height_m":ridge_h,"width_m":W,"length_m":L,"front_height_m":Hf,"back_height_m":Hb,
-"posts_per_side":nside,"post_cm":pc*100,"beam_cm":[bw*100,bh*100],
+"posts_per_side":nside,"post_mode":post_mode,"posts":posts,"rafter_direction":rafter_direction,"post_cm":pc*100,"beam_cm":[bw*100,bh*100],
 "rafter_cm":[rw*100,rh*100],"rafter_spacing_m":spacing,"overhang_m":overhang,
 "braces":braces,"brace_length_m":brace_len}
 st.download_button("💾 Zapisz projekt",json.dumps(project,indent=2,ensure_ascii=False),
-                   "wiata-v0.4.json","application/json")
+                   "wiata-v0.5.json","application/json")
 st.warning("Model służy do projektowania geometrii i zestawienia materiału. Nie zastępuje obliczeń konstrukcyjnych.")
