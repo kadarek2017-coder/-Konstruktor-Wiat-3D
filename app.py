@@ -3,8 +3,8 @@ import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
 
-VERSION = "0.7"
-st.set_page_config(page_title=f"Konstruktor Wiat 3D v{VERSION}", page_icon="🏗️", layout="wide")
+VERSION = "0.7.1"
+st.set_page_config(page_title=f"Konstruktor Wiat 3D v{VERSION}", page_icon="🏗️", layout="wide", initial_sidebar_state="collapsed")
 st.title(f"Konstruktor Wiat 3D v{VERSION}")
 st.caption("Parametryczny model drewnianej wiaty + ręczna biblioteka elementów 3D")
 
@@ -206,7 +206,7 @@ if show_ground:
     box(-.35,W+.35,-.35,L+.35,-.035,0,"Podłoże",.12)
 
 fig.update_layout(
-    height=720, margin=dict(l=0,r=0,t=10,b=0),
+    height=900, margin=dict(l=0,r=0,t=5,b=0),
     scene=dict(
         xaxis_title="Szerokość [m]",yaxis_title="Długość [m]",zaxis_title="Wysokość [m]",
         aspectmode="data",camera=dict(eye=dict(x=1.45,y=-1.65,z=1.05))
@@ -214,7 +214,7 @@ fig.update_layout(
     showlegend=False
 )
 
-c1,c2=st.columns([2.3,1])
+c1,c2=st.columns([4.5,1])
 with c1:
     st.subheader("Model 3D")
     st.plotly_chart(fig,use_container_width=True)
@@ -250,5 +250,5 @@ project={"version":VERSION,"roof_type":roof_type,"ridge_height_m":ridge_h,"width
 "rafter_cm":[rw*100,rh*100],"rafter_spacing_m":spacing,"overhang_m":overhang,
 "braces":braces,"brace_length_m":brace_len,"custom_elements":st.session_state.custom_elements}
 st.download_button("💾 Zapisz projekt",json.dumps(project,indent=2,ensure_ascii=False),
-                   "wiata-v0.7.json","application/json")
+                   "wiata-v0.7.1.json","application/json")
 st.warning("Model służy do projektowania geometrii i zestawienia materiału. Nie zastępuje obliczeń konstrukcyjnych.")
