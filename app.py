@@ -3,12 +3,14 @@ import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
 
-VERSION = "0.6"
+VERSION = "0.7"
 st.set_page_config(page_title=f"Konstruktor Wiat 3D v{VERSION}", page_icon="🏗️", layout="wide")
 st.title(f"Konstruktor Wiat 3D v{VERSION}")
 st.caption("Parametryczny model drewnianej wiaty + ręczna biblioteka elementów 3D")
 
 ELEMENT_LIBRARY={"Słup":{"a":.20,"b":.20,"length":3.0,"dir":"Z"},"Belka":{"a":.10,"b":.20,"length":3.0,"dir":"X"},"Krokiew":{"a":.08,"b":.18,"length":4.0,"dir":"X"},"Płatew":{"a":.10,"b":.20,"length":3.0,"dir":"Y"},"Łata":{"a":.04,"b":.06,"length":3.0,"dir":"X"},"Zastrzał":{"a":.08,"b":.08,"length":.8,"dir":"X"},"Blacha dachowa":{"a":1.10,"b":.005,"length":3.0,"dir":"Y"},"Stopa / kotwa":{"a":.20,"b":.20,"length":.20,"dir":"Z"}}
+WOOD_COLORS={"Świerk":"#C9A66B","Sosna":"#D2AE72","Modrzew":"#B77945","Dąb":"#9B6B3E","KVH":"#D0A66A","BSH":"#B98550"}
+FINISH_COLORS={"Surowe":None,"Olej naturalny":"#A97845","Impregnat jasny":"#B88958","Impregnat ciemny":"#6F4A2F","Biały":"#E7E3D8","Grafit":"#55575A"}
 if "custom_elements" not in st.session_state: st.session_state.custom_elements=[]
 
 with st.sidebar:
@@ -78,8 +80,16 @@ with q1: direction=st.selectbox("Kierunek",["X","Y","Z"],index=["X","Y","Z"].ind
 with q2: ea=st.number_input("A [m]",.005,2.0,float(preset["a"]),.01,key="ea")
 with q3: eb=st.number_input("B [m]",.005,2.0,float(preset["b"]),.01,key="eb")
 with q4: elen=st.number_input("Długość [m]",.05,15.0,float(preset["length"]),.05,key="elen")
+is_wood=element_type in ["Słup","Belka","Krokiew","Płatew","Łata","Zastrzał"]
+m1,m2=st.columns(2)
+if is_wood:
+    with m1: material=st.selectbox("Rodzaj drewna",list(WOOD_COLORS.keys()))
+    with m2: finish=st.selectbox("Wykończenie",list(FINISH_COLORS.keys()))
+else:
+    material="Stal/blacha" if element_type in ["Blacha dachowa","Stopa / kotwa"] else "Inny"
+    finish="Fabryczne"
 if st.button("➕ Dodaj element do konstrukcji"):
-    st.session_state.custom_elements.append({"id":len(st.session_state.custom_elements)+1,"type":element_type,"x":ex,"y":ey,"z":ez,"a":ea,"b":eb,"length":elen,"direction":direction})
+    st.session_state.custom_elements.append({"id":len(st.session_state.custom_elements)+1,"type":element_type,"x":ex,"y":ey,"z":ez,"a":ea,"b":eb,"length":elen,"direction":direction,"material":material,"finish":finish})
     st.rerun()
 if st.session_state.custom_elements:
     st.dataframe(pd.DataFrame(st.session_state.custom_elements),use_container_width=True,hide_index=True)
@@ -88,7 +98,7 @@ if st.session_state.custom_elements:
 
 fig=go.Figure()
 
-def box(x0,x1,y0,y1,z0,z1,name,opacity=1.0):
+def box(x0,x1,y0,y1,z0,z1,name,opacity=1.0,color=None):
     x=[x0,x1,x1,x0,x0,x1,x1,x0]
     y=[y0,y0,y1,y1,y0,y0,y1,y1]
     z=[z0,z0,z0,z0,z1,z1,z1,z1]
@@ -97,7 +107,7 @@ def box(x0,x1,y0,y1,z0,z1,name,opacity=1.0):
         i=[0,0,0,1,1,2,4,4,4,5,5,6],
         j=[1,2,4,2,5,3,5,6,0,6,1,7],
         k=[2,3,5,5,6,7,6,7,7,7,2,3],
-        flatshading=True, opacity=opacity, name=name,
+        flatshading=True, opacity=opacity, name=name, color=color,
         hovertemplate=f"{name}<extra></extra>", showscale=False
     ))
 
@@ -181,9 +191,15 @@ if braces:
 # elementy ręczne z biblioteki
 for el in st.session_state.custom_elements:
     x,y,z,a,b,ln=el["x"],el["y"],el["z"],el["a"],el["b"],el["length"]
-    if el["direction"]=="X": box(x,x+ln,y-a/2,y+a/2,z,z+b,f'{el["type"]} R{el["id"]}')
-    elif el["direction"]=="Y": box(x-a/2,x+a/2,y,y+ln,z,z+b,f'{el["type"]} R{el["id"]}')
-    else: box(x-a/2,x+a/2,y-b/2,y+b/2,z,z+ln,f'{el["type"]} R{el["id"]}')
+    mat=el.get("material","Świerk")
+    fin=el.get("finish","Surowe")
+    if el["type"] in ["Blacha dachowa","Stopa / kotwa"]:
+        elcolor="#8B9198"
+    else:
+        elcolor=FINISH_COLORS.get(fin) or WOOD_COLORS.get(mat,"#C9A66B")
+    if el["direction"]=="X": box(x,x+ln,y-a/2,y+a/2,z,z+b,f'{el["type"]} R{el["id"]} — {mat}',color=elcolor)
+    elif el["direction"]=="Y": box(x-a/2,x+a/2,y,y+ln,z,z+b,f'{el["type"]} R{el["id"]} — {mat}',color=elcolor)
+    else: box(x-a/2,x+a/2,y-b/2,y+b/2,z,z+ln,f'{el["type"]} R{el["id"]} — {mat}',color=elcolor)
 
 # podłoże
 if show_ground:
@@ -234,5 +250,5 @@ project={"version":VERSION,"roof_type":roof_type,"ridge_height_m":ridge_h,"width
 "rafter_cm":[rw*100,rh*100],"rafter_spacing_m":spacing,"overhang_m":overhang,
 "braces":braces,"brace_length_m":brace_len,"custom_elements":st.session_state.custom_elements}
 st.download_button("💾 Zapisz projekt",json.dumps(project,indent=2,ensure_ascii=False),
-                   "wiata-v0.6.json","application/json")
+                   "wiata-v0.7.json","application/json")
 st.warning("Model służy do projektowania geometrii i zestawienia materiału. Nie zastępuje obliczeń konstrukcyjnych.")
