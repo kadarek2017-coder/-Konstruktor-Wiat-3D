@@ -3,14 +3,14 @@ import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
 
-VERSION = "0.9"
+VERSION = "0.9.1"
 st.set_page_config(page_title=f"Konstruktor Wiat 3D v{VERSION}", page_icon="🏗️", layout="wide", initial_sidebar_state="collapsed")
 st.title(f"Konstruktor Wiat 3D v{VERSION}")
 st.caption("Parametryczny model drewnianej wiaty + ręczna biblioteka elementów 3D")
 
 ELEMENT_LIBRARY={"Słup":{"a":.20,"b":.20,"length":3.0,"dir":"Z"},"Belka":{"a":.10,"b":.20,"length":3.0,"dir":"X"},"Krokiew":{"a":.08,"b":.18,"length":4.0,"dir":"X"},"Płatew":{"a":.10,"b":.20,"length":3.0,"dir":"Y"},"Łata":{"a":.04,"b":.06,"length":3.0,"dir":"X"},"Zastrzał":{"a":.08,"b":.08,"length":.8,"dir":"X"},"Blacha dachowa":{"a":1.10,"b":.005,"length":3.0,"dir":"Y"},"Stopa / kotwa":{"a":.20,"b":.20,"length":.20,"dir":"Z"}}
-WOOD_COLORS={"Świerk":"#C9A66B","Sosna":"#D2AE72","Modrzew":"#B77945","Dąb":"#9B6B3E","KVH":"#D0A66A","BSH":"#B98550"}
-FINISH_COLORS={"Surowe":None,"Olej naturalny":"#A97845","Impregnat jasny":"#B88958","Impregnat ciemny":"#6F4A2F","Biały":"#E7E3D8","Grafit":"#55575A"}
+WOOD_COLORS={"Świerk":"#B98A58","Sosna":"#C49A67","Modrzew":"#A96F43","Dąb":"#8B603B","KVH":"#BE9360","BSH":"#AD7D4E"}
+FINISH_COLORS={"Surowe":None,"Olej naturalny":"#9D7046","Impregnat jasny":"#A98055","Impregnat ciemny":"#65462F","Biały":"#DED9CE","Grafit":"#55575A"}
 if "custom_elements" not in st.session_state: st.session_state.custom_elements=[]
 if "style_overrides" not in st.session_state: st.session_state.style_overrides={}
 
@@ -150,7 +150,9 @@ def box(x0,x1,y0,y1,z0,z1,name,opacity=1.0,color=None):
         i=[0,0,0,1,1,2,4,4,4,5,5,6],
         j=[1,2,4,2,5,3,5,6,0,6,1,7],
         k=[2,3,5,5,6,7,6,7,7,7,2,3],
-        flatshading=True, opacity=opacity, name=name, color=color,
+        flatshading=False, opacity=opacity, name=name, color=color,
+        lighting=dict(ambient=.72,diffuse=.72,specular=.08,roughness=.92,fresnel=.03),
+        lightposition=dict(x=120,y=-180,z=220),
         hovertemplate=f"{name}<extra></extra>", showscale=False
     ))
 
@@ -249,12 +251,15 @@ for el in st.session_state.custom_elements:
 
 # podłoże
 if show_ground:
-    box(-.35,W+.35,-.35,L+.35,-.035,0,"Podłoże",.12)
+    box(-.35,W+.35,-.35,L+.35,-.035,0,"Podłoże",.10,color="#8A8A82")
 
 fig.update_layout(
     height=900, margin=dict(l=0,r=0,t=5,b=0),
     scene=dict(
-        xaxis_title="Szerokość [m]",yaxis_title="Długość [m]",zaxis_title="Wysokość [m]",
+        bgcolor="#F3F0E9",
+        xaxis=dict(title="Szerokość [m]",backgroundcolor="#F3F0E9",gridcolor="#D8D2C7",showbackground=True),
+        yaxis=dict(title="Długość [m]",backgroundcolor="#F3F0E9",gridcolor="#D8D2C7",showbackground=True),
+        zaxis=dict(title="Wysokość [m]",backgroundcolor="#F3F0E9",gridcolor="#D8D2C7",showbackground=True),
         aspectmode="data",camera=dict(eye=dict(x=1.45,y=-1.65,z=1.05))
     ),
     showlegend=False
@@ -314,5 +319,5 @@ project={"version":VERSION,"roof_type":roof_type,"ridge_height_m":ridge_h,"width
 "rafter_cm":[rw*100,rh*100],"rafter_spacing_m":spacing,"overhang_m":overhang,
 "braces":braces,"brace_length_m":brace_len,"wood_material":base_wood,"wood_finish":base_finish,"style_overrides":st.session_state.style_overrides,"custom_elements":st.session_state.custom_elements}
 st.download_button("💾 Zapisz projekt",json.dumps(project,indent=2,ensure_ascii=False),
-                   "wiata-v0.9.json","application/json")
+                   "wiata-v0.9.1.json","application/json")
 st.warning("Model służy do projektowania geometrii i zestawienia materiału. Nie zastępuje obliczeń konstrukcyjnych.")
