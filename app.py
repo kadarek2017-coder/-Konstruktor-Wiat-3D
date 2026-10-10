@@ -4,7 +4,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import plotly.graph_objects as go
 
-VERSION = "1.7"
+VERSION = "1.8"
 st.set_page_config(page_title=f"Konstruktor Wiat 3D v{VERSION}", page_icon="🏗️", layout="wide", initial_sidebar_state="collapsed")
 st.title(f"Konstruktor Wiat 3D v{VERSION}")
 st.caption("Parametryczny model drewnianej wiaty + ręczna biblioteka elementów 3D")
@@ -15,6 +15,8 @@ FINISH_COLORS={"Surowe":None,"Olej naturalny":"#9D7046","Impregnat jasny":"#A980
 if "custom_elements" not in st.session_state: st.session_state.custom_elements=[]
 if "style_overrides" not in st.session_state: st.session_state.style_overrides={}
 if "library_element" not in st.session_state: st.session_state.library_element="Słup"
+if "joinery" not in st.session_state:
+    st.session_state.joinery={"post_beam":"Czop i gniazdo","rafter_beam":"Wrąb krokwiowy","brace":"Czop i gniazdo","show":True}
 
 with st.sidebar:
     st.header("Wymiary")
@@ -52,6 +54,30 @@ with st.sidebar:
     base_finish=st.selectbox("Wykończenie konstrukcji",list(FINISH_COLORS.keys()),index=0)
     base_wood_color=FINISH_COLORS.get(base_finish) or WOOD_COLORS[base_wood]
     st.caption("Domyślny wygląd całej konstrukcji. Wybrane elementy można nadpisać niżej.")
+
+st.subheader("🪚 Połączenia ciesielskie")
+st.caption("Wybierz sposób połączenia. Model pokazuje je poglądowo w 3D; dobór nośności i wymiarów węzła wymaga osobnego sprawdzenia konstrukcyjnego.")
+j1,j2,j3=st.columns(3)
+with j1:
+    st.session_state.joinery["post_beam"]=st.selectbox(
+        "Słup ↔ belka",
+        ["Czop i gniazdo","Nakładka / pół-drewna","Śruby przelotowe","Łącznik stalowy"],
+        index=["Czop i gniazdo","Nakładka / pół-drewna","Śruby przelotowe","Łącznik stalowy"].index(st.session_state.joinery.get("post_beam","Czop i gniazdo"))
+    )
+with j2:
+    st.session_state.joinery["rafter_beam"]=st.selectbox(
+        "Krokiew ↔ belka",
+        ["Wrąb krokwiowy","Nakładka / pół-drewna","Wkręty ciesielskie","Łącznik stalowy"],
+        index=["Wrąb krokwiowy","Nakładka / pół-drewna","Wkręty ciesielskie","Łącznik stalowy"].index(st.session_state.joinery.get("rafter_beam","Wrąb krokwiowy"))
+    )
+with j3:
+    st.session_state.joinery["brace"]=st.selectbox(
+        "Zastrzał ↔ słup/belka",
+        ["Czop i gniazdo","Nakładka / pół-drewna","Śruby przelotowe"],
+        index=["Czop i gniazdo","Nakładka / pół-drewna","Śruby przelotowe"].index(st.session_state.joinery.get("brace","Czop i gniazdo"))
+    )
+st.session_state.joinery["show"]=st.checkbox("Pokaż detale połączeń w modelu 3D",value=bool(st.session_state.joinery.get("show",True)))
+st.info("Połączenia są wizualizacją projektu. Program nie traktuje jeszcze wybranego węzła jako obliczenia konstrukcyjnego.")
 
 # Edycja wyglądu pojedynczych elementów i grup
 with st.expander("🎨 Kolorowanie elementów / grup", expanded=False):
@@ -386,7 +412,7 @@ fig.update_layout(
 # Nowy renderer Three.js — pełne, nieprzezroczyste bryły z oświetleniem i cieniami
 three_data={"W":W,"L":L,"Hf":Hf,"Hb":Hb,"bh":bh,"bw":bw,"pc":pc,"rw":rw,"rh":rh,
             "posts":posts,"rafters":positions,"rafter_direction":rafter_direction,
-            "roof_type":roof_type,"ridge_h":ridge_h,"overhang":overhang,"wood":base_wood_color,"braces":braces,"brace_len":brace_len,"custom_elements":st.session_state.custom_elements}
+            "roof_type":roof_type,"ridge_h":ridge_h,"overhang":overhang,"wood":base_wood_color,"braces":braces,"brace_len":brace_len,"custom_elements":st.session_state.custom_elements,"joinery":st.session_state.joinery}
 three_json=json.dumps(three_data,ensure_ascii=False)
 three_html=f"""
 <div style="position:relative">
@@ -497,6 +523,40 @@ if(d.rafter_direction==='W poprzek (X)'){{
  }});
 }}
 
+// poglądowe detale połączeń ciesielskich
+const steel=new THREE.MeshStandardMaterial({{color:0x60666b,roughness:.42,metalness:.72}});
+const cutWood=new THREE.MeshStandardMaterial({{color:0xd8aa73,roughness:.82,metalness:0}});
+function jointMarker(x,y,z,kind){{
+ if(!d.joinery || !d.joinery.show) return;
+ if(kind==="Łącznik stalowy"){{
+   addBox(x,y,z,.28,.035,.28,steel,"Łącznik stalowy","Łącznik",false);
+ }} else if(kind==="Śruby przelotowe" || kind==="Wkręty ciesielskie"){{
+   const bolt=new THREE.Mesh(new THREE.CylinderGeometry(.018,.018,.34,16),steel);
+   bolt.rotation.z=Math.PI/2; bolt.position.set(x,y,z); scene.add(bolt);
+ }} else if(kind==="Nakładka / pół-drewna"){{
+   addBox(x,y,z,.24,.24,.055,cutWood,"Nakładka","Pół-drewna",false);
+ }} else if(kind==="Wrąb krokwiowy"){{
+   // jasny klin/stopa pokazuje miejsce oparcia i podcięcia krokwi
+   addBox(x,y,z,.22,.18,.045,cutWood,"Wrąb","Wrąb krokwiowy",false);
+ }} else {{
+   // czop/gniazdo: widoczny jaśniejszy rdzeń w osi słupa
+   addBox(x,y,z,.09,.09,.16,cutWood,"Czop","Czop i gniazdo",false);
+ }}
+}}
+if(d.joinery && d.joinery.show){{
+ d.posts.forEach(p=>{{
+   const x=p["X [m]"], y=p["Y [m]"], z=roofH(y,x)-d.bh;
+   jointMarker(x,y,z,d.joinery.post_beam);
+ }});
+ // znaczniki oparcia krokwi na bocznych belkach
+ if(d.rafter_direction==="W poprzek (X)"){{
+   d.rafters.forEach(y=>{{
+     jointMarker(0,y,roofH(y,0)+.025,d.joinery.rafter_beam);
+     jointMarker(d.W,y,roofH(y,d.W)+.025,d.joinery.rafter_beam);
+   }});
+ }}
+}}
+
 // elementy dodane z graficznej biblioteki
 (d.custom_elements || []).forEach(el=>{{
  const x=Number(el.x)||0, y=Number(el.y)||0, z=Number(el.z)||0;
@@ -595,5 +655,5 @@ project={"version":VERSION,"roof_type":roof_type,"ridge_height_m":ridge_h,"width
 "rafter_cm":[rw*100,rh*100],"rafter_spacing_m":spacing,"overhang_m":overhang,
 "braces":braces,"brace_length_m":brace_len,"wood_material":base_wood,"wood_finish":base_finish,"wood_detail":wood_detail,"style_overrides":st.session_state.style_overrides,"custom_elements":st.session_state.custom_elements}
 st.download_button("💾 Zapisz projekt",json.dumps(project,indent=2,ensure_ascii=False),
-                   "wiata-v1.7.json","application/json")
+                   "wiata-v1.8.json","application/json")
 st.warning("Model służy do projektowania geometrii i zestawienia materiału. Nie zastępuje obliczeń konstrukcyjnych.")
