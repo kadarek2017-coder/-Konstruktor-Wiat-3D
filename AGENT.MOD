@@ -363,3 +363,18 @@ Generator wiaty potrafi rozpoznać styki słupów z belkami obwodowymi.
 - etap ten tworzy trwałą relację konstrukcyjną; fizyczne seryjne wycinanie wszystkich wykrytych węzłów będzie następnym krokiem.
 
 Nie oznaczamy połączeń katalogowych jako wykonanych, dopóki nie istnieje rzeczywisty generator geometrii i kontrola kolizji.
+
+
+## 45. Dokładny model parametryczny — etap 5
+Generator przechodzi z orientacyjnych brył na jawne parametry konstrukcji w milimetrach.
+- szerokość i długość są parametrami modelu,
+- wysokość słupów jest osobnym parametrem,
+- przekrój słupa jest parametrem geometrii,
+- szerokość i wysokość oczepu są parametrami geometrii,
+- okap jest parametrem dachu,
+- maksymalny rozstaw krokwi steruje liczbą i rzeczywistym rozstawem krokwi,
+- wartości są walidowane przed wygenerowaniem konstrukcji,
+- zmiany parametrów aktualizują podgląd na żywo,
+- zatwierdzony model korzysta z tych samych parametrów co podgląd.
+
+Następny etap dokładności: jednoznaczna definicja wymiaru całkowitego względem osi/krawędzi, dokładne rozstawy słupów, przekroje krokwi i kalenicy oraz automatyczne przeliczanie zależnych węzłów.
