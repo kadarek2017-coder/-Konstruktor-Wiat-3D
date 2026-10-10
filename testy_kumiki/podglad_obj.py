@@ -7,44 +7,80 @@ Potem uruchom:
     streamlit run testy_kumiki/podglad_obj.py
 """
 from pathlib import Path
+import io
+import json
+import subprocess
+import sys
 import streamlit as st
 import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Podgląd Kumiki 3D", page_icon="🪚", layout="wide")
 st.title("🪚 Podgląd Kumiki 3D")
+st.caption("Wersja podglądu 3 — kontrola położenia czopa przed wyświetleniem")
 st.caption("Czop i gniazdo: słup 200×200 mm + belka o szerokości 100 mm i wysokości 200 mm. Jednostki: mm.")
 
-base = Path(__file__).resolve().parent / "wyniki"
+app_dir = Path(__file__).resolve().parent
+base = app_dir / "wyniki"
+if st.button("Wygeneruj poprawiony model", type="primary"):
+    with st.spinner("Generowanie i sprawdzanie czopa oraz gniazda…"):
+        try:
+            result = subprocess.run(
+                [sys.executable, str(app_dir / "generuj_czop.py")],
+                capture_output=True, text=True, timeout=60, check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            st.error(f"Nie udało się wygenerować modelu: {exc}")
+            st.stop()
+    if result.returncode:
+        st.error("Generowanie nie powiodło się.")
+        st.code(result.stderr or result.stdout)
+        st.stop()
+    st.success("Wygenerowano poprawiony model.")
 paths = [base / "SLUP_200x200.obj", base / "BELKA_100x200.obj"]
 missing = [p.name for p in paths if not p.exists()]
 if missing:
     st.error("Brakuje plików OBJ: " + ", ".join(missing))
-    st.code("python testy_kumiki/generuj_czop.py")
+    st.info("Kliknij „Wygeneruj poprawiony model” powyżej.")
     st.stop()
 
 # OBJ jest tekstowy; osadzamy go lokalnie w HTML. Viewer nie wysyła modeli na zewnętrzny serwer.
 objs = [p.read_text(encoding="utf-8", errors="ignore") for p in paths]
 # Bezpieczne osadzenie w JS jako literały JSON.
-import json
 obj_json = json.dumps(objs)
-report_path = base / "wymiary.json"
-if not report_path.exists():
-    st.warning("Te modele pochodzą ze starszego eksportu. Wygeneruj je ponownie poprawionym skryptem.")
-    st.code("python testy_kumiki/generuj_czop.py")
+try:
+    import trimesh
+    # Import generatora z tego samego katalogu co podgląd.
+    import importlib
+    sys.path.insert(0, str(app_dir))
+    try:
+        import generuj_czop
+        importlib.reload(generuj_czop)
+    finally:
+        sys.path.pop(0)
+    meshes = {path.stem: trimesh.load_mesh(io.StringIO(obj), file_type="obj")
+              for path, obj in zip(paths, objs)}
+    generuj_czop.validate_meshes(meshes)
+except ImportError:
+    st.error("Brakuje zależności do sprawdzenia i generowania modelu.")
+    st.code("python -m pip install -r testy_kumiki/requirements.txt")
     st.stop()
-report = json.loads(report_path.read_text(encoding="utf-8"))
+except (ValueError, OSError) as exc:
+    st.error("Wczytane pliki zawierają stary lub błędny model: " + str(exc))
+    st.info("Kliknij „Wygeneruj poprawiony model” powyżej. Podgląd pojawi się po poprawnym sprawdzeniu geometrii.")
+    st.stop()
+st.success("Sprawdzono pliki OBJ: czop 150 × 33,33 mm mieści się w szerokości belki.")
 st.caption("Oś belki: 2200 mm · spód belki i bark słupa: 2100 mm · koniec czopa: 2300 mm.")
 st.table([
-    {"Element": name, "X [mm]": round(part["size_mm"][0], 2),
-     "Y [mm]": round(part["size_mm"][1], 2), "Z [mm]": round(part["size_mm"][2], 2)}
-    for name, part in report["parts"].items()
+    {"Element": name, "X [mm]": round(mesh.extents[0], 2),
+     "Y [mm]": round(mesh.extents[1], 2), "Z [mm]": round(mesh.extents[2], 2)}
+    for name, mesh in meshes.items()
 ])
 
 html = """
 <div id="wrap" style="position:relative;width:100%;height:760px;border-radius:12px;overflow:hidden;background:#e9e5dd">
  <div id="view" style="width:100%;height:100%"></div>
  <div style="position:absolute;left:14px;top:14px;background:rgba(255,255,255,.93);padding:10px 13px;border-radius:9px;font:14px -apple-system,BlinkMacSystemFont,sans-serif">
-  <b>Kumiki — czop i gniazdo</b><br>
+  <b>Kumiki — czop i gniazdo · wersja 3</b><br>
   Lewy przycisk: obrót · rolka: zoom · prawy: przesuwanie
  </div>
 </div>

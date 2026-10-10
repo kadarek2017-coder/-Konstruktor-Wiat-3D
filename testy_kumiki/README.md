@@ -17,6 +17,12 @@ python -m streamlit run testy_kumiki/podglad_obj.py
 
 Jeśli środowisko już istnieje, zacznij od polecenia `source`.
 
+W podglądzie wersji 3 przycisk **Wygeneruj poprawiony model** uruchamia
+generator tym samym Pythonem co Streamlit i od razu wczytuje nowe pliki.
+Każde wyświetlenie sprawdza geometrię OBJ, w tym orientację przekroju
+czopa. Stary, błędny model jest blokowany, nawet jeśli pozostał po nim
+plik `wymiary.json`. Tabela wymiarów pochodzi bezpośrednio z OBJ.
+
 ## Jednostki i położenie
 
 Kumiki otrzymuje wymiary w **metrach**, przez `k.mm(...)`.
