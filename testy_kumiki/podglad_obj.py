@@ -152,7 +152,7 @@ html = """
  </style>
  <div id="view" style="width:100%;height:100%"></div>
  <div style="position:absolute;left:14px;top:14px;background:rgba(255,255,255,.93);padding:10px 13px;border-radius:9px;font:14px -apple-system,BlinkMacSystemFont,sans-serif">
-  <b>Kumiki — rama i połączenia · wersja 17</b><br>
+  <b>Kumiki — rama i połączenia · wersja 17.1</b><br>
   Klik = jeden element · Shift/Ctrl/Cmd + klik = dodaj/usuń z zaznaczenia.<br>
   Dwa zaznaczone elementy automatycznie stają się parą A/B do połączenia.<br>
   Chwyć element bez klawisza modyfikującego, aby go przeciągnąć.<br>
@@ -203,6 +203,7 @@ html = """
   <p id="model-counts" style="margin:8px 0"></p>
   <button id="save-project" type="button">Zapisz projekt</button>
   <button id="load-project" type="button">Wczytaj projekt</button>
+  <button id="clear-project" type="button">Wyczyść projekt</button>
   <input id="project-file" type="file" accept=".json,application/json" hidden>
   <div id="part-status" role="status" aria-live="polite" style="margin-top:8px"></div>
  </aside>
@@ -679,6 +680,29 @@ function loadProject(data){
  group.children.forEach((part,i)=>registerPart(i));choose(-1);fitAll();
  document.getElementById('part-status').textContent='Wczytano projekt: '+group.children.length+' elementów.';
 }
+function clearProject(){
+ clearLiveCarport();
+ selectedIndices.clear();choose(-1);jointA=-1;jointB=-1;reference=null;transform.detach();
+ document.getElementById('reference-name').textContent='Odniesienie: brak';
+ while(group.children.length){
+  const part=group.children[group.children.length-1];group.remove(part);
+  part.traverse(o=>{if(o.isMesh){o.geometry?.dispose();if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material?.dispose();}});
+ }
+ labels.length=0;beams.length=0;partCards.length=0;
+ select.replaceChildren();const placeholder=document.createElement('option');placeholder.value='-1';placeholder.textContent='Wybierz element…';select.appendChild(placeholder);
+ document.getElementById('model-parts').replaceChildren();
+ for(const id of ['joint-select-a','joint-select-b']){
+  const list=document.getElementById(id);list.replaceChildren();const empty=document.createElement('option');empty.value='-1';empty.textContent='Wybierz element…';list.appendChild(empty);
+ }
+ group.visible=true;dimensionLine.visible=false;
+ parsedCarport=null;document.getElementById('carport-prompt').value='';document.getElementById('generate-carport').disabled=true;
+ document.getElementById('carport-preview').textContent='Pisz opis — podgląd 3D pojawi się automatycznie.';
+ syncPair();syncInputs();controls.target.set(0,0,0);camera.position.set(4800,-6500,4300);controls.update();
+ document.getElementById('part-status').textContent='Projekt wyczyszczony. Możesz rozpocząć nową konstrukcję.';
+}
+document.getElementById('clear-project').addEventListener('click',()=>{
+ if(confirm('Wyczyścić cały projekt? Ta operacja usunie wszystkie elementy z bieżącej sceny.'))clearProject();
+});
 document.getElementById('save-project').addEventListener('click',saveProject);
 const projectFile=document.getElementById('project-file');
 document.getElementById('load-project').addEventListener('click',()=>projectFile.click());
