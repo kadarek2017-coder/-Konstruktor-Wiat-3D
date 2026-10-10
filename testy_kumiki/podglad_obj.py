@@ -691,6 +691,39 @@ projectFile.addEventListener('change',async()=>{
  finally{projectFile.value='';}
 });
 
+
+let parsedCarport=null;
+function parseCarport(text){
+ const t=text.toLowerCase().replaceAll('×','x').replaceAll(',','.');
+ const pair=t.match(/([0-9]+(?:\.[0-9]+)?)\s*x\s*([0-9]+(?:\.[0-9]+)?)\s*(m|mm)?/);
+ const wm=t.match(/szeroko[a-ząćęłńóśźż]*\s*(?:ma\s*mieć\s*)?([0-9]+(?:\.[0-9]+)?)\s*(m|mm)?/);
+ const lm=t.match(/długo[a-ząćęłńóśźż]*\s*(?:ma\s*mieć\s*)?([0-9]+(?:\.[0-9]+)?)\s*(m|mm)?/);
+ const pm=t.match(/([0-9]+)\s*(?:słup[a-ząćęłńóśźż]*|slup[a-z]*)/);
+ const mm=(v,u)=>Number(v)*(u==='mm'?1:1000);
+ const width=wm?mm(wm[1],wm[2]||'m'):pair?mm(pair[1],pair[3]||'m'):null;
+ const length=lm?mm(lm[1],lm[2]||'m'):pair?mm(pair[2],pair[3]||'m'):null;
+ const posts=pm?Number(pm[1]):null;
+ if(!width||!length||width<2000||length<2000||width>20000||length>20000)throw new Error('Podaj wymiary od 2 do 20 m, np. 7x6 m.');
+ if(!Number.isInteger(posts)||posts<4||posts>40)throw new Error('Podaj od 4 do 40 słupów.');
+ return {width,length,posts};
+}
+function carportPostPositions(w,l,n){
+ const a=[];
+ if(n===9){for(const y of [-l/2,0,l/2])for(const x of [-w/2,0,w/2])a.push([x,y]);return a;}
+ const p=2*(w+l);
+ for(let i=0;i<n;i++){let d=i*p/n,x=-w/2,y=-l/2;if(d<=w)x+=d;else if((d-=w)<=l){x=w/2;y+=d;}else if((d-=l)<=w){x=w/2-d;y=l/2;}else{x=-w/2;y=l/2-(d-w);}a.push([x,y]);}
+ return a;
+}
+function addCarportMember(type,dims,pos,label){
+ const part=catalogPart(type,dims);part.position.copy(pos);part.userData.home=part.position.clone();part.userData.added=true;
+ part.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
+ group.add(part);labels.push(label);const i=group.children.length-1;if(catalog[type].label.startsWith('Belka'))beams.push(part);registerPart(i);return i;
+}
+document.getElementById('parse-carport').addEventListener('click',()=>{
+ try{parsedCarport=parseCarport(document.getElementById('carport-prompt').value);document.getElementById('carport-preview').textContent='Odczytano: '+parsedCarport.width/1000+' x '+parsedCarport.length/1000+' m, '+parsedCarport.posts+' słupów.';document.getElementById('generate-carport').disabled=false;}
+ catch(e){parsedCarport=null;document.getElementById('generate-carport').disabled=true;document.getElementById('carport-preview').textContent=e.message;}
+});
+
 catalog.forEach((spec,type)=>{
  const card=document.createElement('button');card.type='button';card.className='part-card';card.draggable=true;
  card.innerHTML=timberIcon(catalogPart(type));
