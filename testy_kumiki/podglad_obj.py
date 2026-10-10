@@ -625,7 +625,7 @@ document.getElementById('fit-all').addEventListener('click',fitAll);
 function projectState(){
  return {format:'kumiki-layout',version:1,model:modelConfig,
   parts:group.children.map((part,i)=>({label:labels[i],position:part.position.toArray(),home:part.userData.home.toArray(),visible:part.visible,
-   definition:part.userData.definition||null}))};
+   definition:part.userData.definition||null,connections:part.userData.connections||[],generatorMeta:part.userData.generatorMeta||null}))};
 }
 function saveProject(){
  const data=projectState();
@@ -720,10 +720,17 @@ function carportPostPositions(w,l,n){
  for(let i=0;i<n;i++){let d=i*p/n,x=-w/2,y=-l/2;if(d<=w)x+=d;else if((d-=w)<=l){x=w/2;y+=d;}else if((d-=l)<=w){x=w/2-d;y=l/2;}else{x=-w/2;y=l/2-(d-w);}a.push([x,y]);}
  return a;
 }
-function addCarportMember(type,dims,pos,label){
+function addCarportMember(type,dims,pos,label,meta=null){
  const part=catalogPart(type,dims);part.position.copy(pos);part.userData.home=part.position.clone();part.userData.added=true;
+ if(meta)part.userData.generatorMeta=meta;
  part.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
  group.add(part);labels.push(label);const i=group.children.length-1;if(catalog[type].label.startsWith('Belka'))beams.push(part);registerPart(i);return i;
+}
+function registerGeneratedJoint(postIndex,beamIndex,node){
+ const post=group.children[postIndex],beam=group.children[beamIndex];
+ const joint={type:'czop_gniazdo',role:'post_beam',other:beamIndex,node:[node.x,node.y,node.z],status:'ready_to_cut'};
+ post.userData.connections=post.userData.connections||[];post.userData.connections.push(joint);
+ beam.userData.connections=beam.userData.connections||[];beam.userData.connections.push({...joint,other:postIndex});
 }
 function updateCarportParse(){
  try{
