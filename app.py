@@ -4,7 +4,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import plotly.graph_objects as go
 
-VERSION = "1.5.1"
+VERSION = "1.6"
 st.set_page_config(page_title=f"Konstruktor Wiat 3D v{VERSION}", page_icon="🏗️", layout="wide", initial_sidebar_state="collapsed")
 st.title(f"Konstruktor Wiat 3D v{VERSION}")
 st.caption("Parametryczny model drewnianej wiaty + ręczna biblioteka elementów 3D")
@@ -154,15 +154,48 @@ for idx,name in enumerate(ELEMENT_LIBRARY):
 element_type=st.session_state.library_element
 preset=ELEMENT_LIBRARY[element_type]
 st.info(f"Wybrano: **{element_type}** — {LIBRARY_HINTS[element_type]}")
+st.markdown("#### 1. Ustaw element")
+if "quick_pos" not in st.session_state: st.session_state.quick_pos="Środek"
+quick_cols=st.columns(5)
+quick_defs=[("Lewo",0.0,L/2),("Środek",W/2,L/2),("Prawo",W,L/2),("Przód",W/2,0.0),("Tył",W/2,L)]
+for col,(label,qx,qy) in zip(quick_cols,quick_defs):
+    with col:
+        if st.button(label,key=f"quick_{label}",use_container_width=True):
+            st.session_state["element_x"]=float(qx)
+            st.session_state["element_y"]=float(qy)
+            st.session_state.quick_pos=label
+            st.rerun()
+
+if "element_x" not in st.session_state: st.session_state.element_x=float(W/2)
+if "element_y" not in st.session_state: st.session_state.element_y=float(L/2)
+if "element_z" not in st.session_state: st.session_state.element_z=0.0
+
 p1,p2,p3=st.columns(3)
-with p1: ex=st.number_input("X elementu [m]",0.0,float(W),0.0,.1)
-with p2: ey=st.number_input("Y elementu [m]",0.0,float(L),0.0,.1)
-with p3: ez=st.number_input("Z elementu [m]",0.0,8.0,0.0,.1)
-q1,q2,q3,q4=st.columns(4)
-with q1: direction=st.selectbox("Kierunek",["X","Y","Z"],index=["X","Y","Z"].index(preset["dir"]))
-with q2: ea=st.number_input("A [m]",.005,2.0,float(preset["a"]),.01,key="ea")
-with q3: eb=st.number_input("B [m]",.005,2.0,float(preset["b"]),.01,key="eb")
-with q4: elen=st.number_input("Długość [m]",.05,15.0,float(preset["length"]),.05,key="elen")
+with p1:
+    ex=st.number_input("↔ X [m]",0.0,float(W),key="element_x",step=.05)
+    st.slider("Pozycja X",0.0,float(W),key="element_x",step=.05,label_visibility="collapsed")
+with p2:
+    ey=st.number_input("↕ Y [m]",0.0,float(L),key="element_y",step=.05)
+    st.slider("Pozycja Y",0.0,float(L),key="element_y",step=.05,label_visibility="collapsed")
+with p3:
+    ez=st.number_input("⬆ Z [m]",0.0,8.0,key="element_z",step=.05)
+    st.slider("Wysokość Z",0.0,8.0,key="element_z",step=.05,label_visibility="collapsed")
+
+st.markdown("#### 2. Kierunek i wielkość")
+q1,q2=st.columns([1,2])
+with q1:
+    direction=st.segmented_control("Kierunek",["X","Y","Z"],default=preset["dir"],key=f"dir_{element_type}")
+with q2:
+    elen=st.number_input("Długość elementu [m]",.05,15.0,float(preset["length"]),.05,key=f"len_{element_type}")
+
+q3,q4=st.columns(2)
+with q3:
+    ea_cm=st.number_input("Przekrój A [cm]",.5,200.0,float(preset["a"]*100),1.0,key=f"ea_{element_type}")
+with q4:
+    eb_cm=st.number_input("Przekrój B [cm]",.5,200.0,float(preset["b"]*100),1.0,key=f"eb_{element_type}")
+ea=ea_cm/100
+eb=eb_cm/100
+st.caption(f"Element: {element_type} • {ea_cm:g} × {eb_cm:g} cm • długość {elen:.2f} m • kierunek {direction}")
 is_wood=element_type in ["Słup","Belka","Krokiew","Płatew","Łata","Zastrzał"]
 m1,m2=st.columns(2)
 if is_wood:
@@ -529,5 +562,5 @@ project={"version":VERSION,"roof_type":roof_type,"ridge_height_m":ridge_h,"width
 "rafter_cm":[rw*100,rh*100],"rafter_spacing_m":spacing,"overhang_m":overhang,
 "braces":braces,"brace_length_m":brace_len,"wood_material":base_wood,"wood_finish":base_finish,"wood_detail":wood_detail,"style_overrides":st.session_state.style_overrides,"custom_elements":st.session_state.custom_elements}
 st.download_button("💾 Zapisz projekt",json.dumps(project,indent=2,ensure_ascii=False),
-                   "wiata-v1.5.1.json","application/json")
+                   "wiata-v1.6.json","application/json")
 st.warning("Model służy do projektowania geometrii i zestawienia materiału. Nie zastępuje obliczeń konstrukcyjnych.")
