@@ -4,7 +4,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import plotly.graph_objects as go
 
-VERSION = "1.4"
+VERSION = "1.5"
 st.set_page_config(page_title=f"Konstruktor Wiat 3D v{VERSION}", page_icon="🏗️", layout="wide", initial_sidebar_state="collapsed")
 st.title(f"Konstruktor Wiat 3D v{VERSION}")
 st.caption("Parametryczny model drewnianej wiaty + ręczna biblioteka elementów 3D")
@@ -113,10 +113,29 @@ else:
 st.subheader("🧰 Graficzna biblioteka elementów")
 st.caption("Wybierz element po rysunku. Parametry wybranego elementu ustawisz poniżej.")
 
-LIBRARY_ICONS={
- "Słup":"▥","Belka":"▰","Krokiew":"╱","Płatew":"━",
- "Łata":"▬","Zastrzał":"╲","Blacha dachowa":"▱","Stopa / kotwa":"⌑"
-}
+def element_thumbnail(name,active=False):
+    stroke="#6f4b2f"
+    wood="#c89a66"
+    light="#e5c49b"
+    metal="#8b9198"
+    bg="#f6eee4" if active else "#faf9f7"
+    border="#b7793f" if active else "#ddd3c6"
+    if name=="Słup":
+        shape=f'<polygon points="54,12 78,24 78,82 54,70" fill="{wood}" stroke="{stroke}"/><polygon points="34,22 54,12 54,70 34,82" fill="{light}" stroke="{stroke}"/><polygon points="34,22 54,32 78,24 54,12" fill="#d9ad79" stroke="{stroke}"/>'
+    elif name in ("Belka","Płatew","Łata"):
+        h={"Belka":22,"Płatew":20,"Łata":11}[name]
+        shape=f'<polygon points="16,47 80,26 96,35 32,57" fill="{wood}" stroke="{stroke}"/><polygon points="32,57 96,35 96,{35+h} 32,{57+h}" fill="#ad7b4d" stroke="{stroke}"/><polygon points="16,47 32,57 32,{57+h} 16,{47+h}" fill="{light}" stroke="{stroke}"/>'
+    elif name in ("Krokiew","Zastrzał"):
+        thick=14 if name=="Krokiew" else 12
+        shape=f'<polygon points="20,70 82,22 94,30 32,78" fill="{wood}" stroke="{stroke}"/><polygon points="32,78 94,30 94,{30+thick} 32,{78+thick}" fill="#a87347" stroke="{stroke}"/>'
+    elif name=="Blacha dachowa":
+        shape=f'<polygon points="13,55 76,25 103,39 40,70" fill="{metal}" stroke="#62676c"/>' + ''.join(f'<line x1="{24+i*13}" y1="{50-i*6}" x2="{51+i*13}" y2="{64-i*6}" stroke="#666b70"/>' for i in range(5))
+    else:
+        shape=f'<rect x="37" y="55" width="38" height="12" rx="2" fill="{metal}" stroke="#5f656b"/><rect x="49" y="27" width="14" height="32" fill="#a5abb0" stroke="#5f656b"/><circle cx="44" cy="61" r="2.5" fill="#555"/><circle cx="68" cy="61" r="2.5" fill="#555"/>'
+    return f"""<div style="height:142px;border:2px solid {border};border-radius:13px;padding:7px;text-align:center;background:{bg}">
+    <svg viewBox="0 0 112 94" width="100%" height="88" role="img" aria-label="{name}">{shape}</svg>
+    <div style="font-weight:700;margin-top:-3px">{name}</div></div>"""
+
 LIBRARY_HINTS={
  "Słup":"20×20 cm · pion","Belka":"10×20 cm · poziom","Krokiew":"8×18 cm · dach",
  "Płatew":"10×20 cm · wzdłuż","Łata":"4×6 cm · dach","Zastrzał":"8×8 cm · ukośny",
@@ -126,13 +145,8 @@ cards=st.columns(4)
 for idx,name in enumerate(ELEMENT_LIBRARY):
     with cards[idx%4]:
         active=st.session_state.library_element==name
-        st.markdown(
-            f"""<div style="height:112px;border:2px solid {'#b7793f' if active else '#ddd3c6'};
-            border-radius:12px;padding:10px;text-align:center;background:{'#f6eee4' if active else '#faf9f7'}">
-            <div style="font-size:34px;line-height:38px;color:#8a603c">{LIBRARY_ICONS[name]}</div>
-            <b>{name}</b><br><span style="font-size:12px;color:#777">{LIBRARY_HINTS[name]}</span></div>""",
-            unsafe_allow_html=True
-        )
+        st.markdown(element_thumbnail(name,active),unsafe_allow_html=True)
+        st.caption(LIBRARY_HINTS[name])
         if st.button(("✓ " if active else "")+f"Wybierz {name}",key=f"lib_{name}",use_container_width=True):
             st.session_state.library_element=name
             st.rerun()
@@ -515,5 +529,5 @@ project={"version":VERSION,"roof_type":roof_type,"ridge_height_m":ridge_h,"width
 "rafter_cm":[rw*100,rh*100],"rafter_spacing_m":spacing,"overhang_m":overhang,
 "braces":braces,"brace_length_m":brace_len,"wood_material":base_wood,"wood_finish":base_finish,"wood_detail":wood_detail,"style_overrides":st.session_state.style_overrides,"custom_elements":st.session_state.custom_elements}
 st.download_button("💾 Zapisz projekt",json.dumps(project,indent=2,ensure_ascii=False),
-                   "wiata-v1.4.json","application/json")
+                   "wiata-v1.5.json","application/json")
 st.warning("Model służy do projektowania geometrii i zestawienia materiału. Nie zastępuje obliczeń konstrukcyjnych.")
