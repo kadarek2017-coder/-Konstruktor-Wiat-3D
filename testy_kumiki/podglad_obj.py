@@ -724,6 +724,26 @@ document.getElementById('parse-carport').addEventListener('click',()=>{
  catch(e){parsedCarport=null;document.getElementById('generate-carport').disabled=true;document.getElementById('carport-preview').textContent=e.message;}
 });
 
+
+document.getElementById('generate-carport').addEventListener('click',()=>{
+ try{
+  if(!parsedCarport)throw new Error('Najpierw odczytaj opis.');
+  const h=Number(document.getElementById('carport-height').value);
+  if(!Number.isFinite(h)||h<1800||h>6000)throw new Error('Wysokość: 1800–6000 mm.');
+  const {width:w,length:l,posts:n}=parsedCarport;
+  if(group.children.length+n+4>500)throw new Error('Za dużo elementów w projekcie.');
+  group.updateMatrixWorld(true);const origin=group.worldToLocal(controls.target.clone());const start=group.children.length;
+  carportPostPositions(w,l,n).forEach((p,k)=>addCarportMember(0,[h,200,200],origin.clone().add(new THREE.Vector3(p[0],p[1],h/2)),'Słup wiaty '+(k+1)));
+  addCarportMember(1,[w+200,140,200],origin.clone().add(new THREE.Vector3(0,-l/2,h+100)),'Belka wiaty przód');
+  addCarportMember(1,[w+200,140,200],origin.clone().add(new THREE.Vector3(0,l/2,h+100)),'Belka wiaty tył');
+  const a=addCarportMember(1,[l+200,140,200],origin.clone().add(new THREE.Vector3(-w/2,0,h+100)),'Belka wiaty lewa');
+  const b=addCarportMember(1,[l+200,140,200],origin.clone().add(new THREE.Vector3(w/2,0,h+100)),'Belka wiaty prawa');
+  group.children[a].rotation.z=Math.PI/2;group.children[b].rotation.z=Math.PI/2;
+  selectPart(start);fitAll();
+  document.getElementById('part-status').textContent='Wygenerowano wiatę '+w/1000+' x '+l/1000+' m: '+n+' słupów i 4 belki. Wszystkie elementy można edytować.';
+ }catch(e){document.getElementById('part-status').textContent=e.message;}
+});
+
 catalog.forEach((spec,type)=>{
  const card=document.createElement('button');card.type='button';card.className='part-card';card.draggable=true;
  card.innerHTML=timberIcon(catalogPart(type));
