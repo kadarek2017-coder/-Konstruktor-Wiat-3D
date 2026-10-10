@@ -17,7 +17,7 @@ python -m streamlit run testy_kumiki/podglad_obj.py
 
 Jeśli środowisko już istnieje, zacznij od polecenia `source`.
 
-W podglądzie wersji 9 przycisk **Wygeneruj poprawiony model** uruchamia
+W podglądzie wersji 10 przycisk **Wygeneruj poprawiony model** uruchamia
 generator tym samym Pythonem co Streamlit i od razu wczytuje nowe pliki.
 Każde wyświetlenie sprawdza geometrię OBJ, w tym orientację przekroju
 czopa. Stary, błędny model jest blokowany, nawet jeśli pozostał po nim
@@ -91,7 +91,7 @@ python testy_kumiki/generuj_czop.py --skeleton --flat
 
 ## Graficzny wybór i katalog części
 
-W wersji 9 panel po prawej zawiera graficzne kafelki wszystkich elementów
+W wersji 10 panel po prawej zawiera graficzne kafelki wszystkich elementów
 modelu. Miniatury powstają z ich rzeczywistej siatki. Kliknij kafelek,
 aby zaznaczyć część (również ukrytą), potem chwyć ją w scenie i przeciągnij.
 Zaznaczenie jest widoczne na kafelku i na modelu; ukryte części mają
@@ -126,6 +126,43 @@ Odświeżenie, generowanie lub przełączenie wariantu odtwarza bazowy model,
 dlatego wcześniej zapisz własny układ. JSON przechowuje układ, a OBJ
 nadal służy do eksportowania geometrii pojedynczego elementu.
 
+## Dokładne ustawienie względem elementu
+
+1. Zaznacz słup lub belkę i w sekcji **Dokładne ustawienie** kliknij
+   **Użyj zaznaczonego jako odniesienia**.
+2. Wybierz oś X/Y/Z, odległość (np. 2000 mm), pomiar między środkami
+   lub prześwit między krawędziami. Ujemna odległość oznacza przeciwny kierunek.
+3. Włącz **Dodawaj względem odniesienia** i kliknij typ w katalogu.
+   Alternatywnie zaznacz inną istniejącą część i kliknij **Ustaw zaznaczony element**.
+4. Przy wielu sztukach pierwsza część otrzymuje podaną odległość, kolejne
+   zwiększają ją o **Rozstaw serii**. W trybie prześwitu rozstaw dotyczy
+   kolejnych środków części tego samego typu.
+
+Pomiar używa środka i krawędzi obwiedni rzeczywistej geometrii, w osiach
+modelu, niezależnie od kamery. **Wyrównaj spód** ustawia taką samą dolną
+wysokość przy dodawaniu w X/Y. Dla elementów ukośnych obwiednia nie jest
+osią długości drewna. Niebieska linia i odczyt pokazują odległość zaznaczonej
+części od odniesienia. To ustawienie jednorazowe, bez trwałego więzu;
+przesunięcie odniesienia nie przesuwa pozostałych części automatycznie.
+Pozycje są zachowywane w JSON, a odniesienie wybierasz ponownie po wczytaniu.
+
+## Baza połączeń ciesielskich i stolarskich
+
+Plik `polaczenia.json` zawiera 12 pozycji z kategorią, opisem parametrów
+i statusem. Panel **Baza połączeń** pokazuje miniatury i filtr kategorii.
+Czop–gniazdo oraz pół drewna mają rzeczywistą geometrię przykładów
+wycinaną w Kumiki. **Dodaj przykład z wycięciami** dodaje dwa nowe,
+dopasowane elementy. Przykłady można rozsuwać, eksportować i zapisywać
+w projekcie. Pozycje pozostałych połączeń mają schematy poglądowe i
+status **Katalog — bez generatora**; nie można dodawać ich wycięć.
+
+Czop–gniazdo korzysta ze sprawdzonego słupa 200×200 i belki 1600×100×200.
+Pół drewna ma dwie prostopadłe belki 1200×100×200 z wycięciem po połowie
+wysokości. Ich objętości, zamknięcie i brak kolizji są sprawdzane przed
+udostępnieniem. Parametry tych przykładów są stałe. Wersja 10 nie wycina
+jeszcze wybranego połączenia w dowolnej wskazanej parze, nie przelicza
+wycięć po przesunięciu ani nie ocenia nośności.
+
 ## Jednostki i położenie
 
 Kumiki otrzymuje wymiary w **metrach**, przez `k.mm(...)`.
@@ -156,7 +193,7 @@ pionowej osi Z. Wyniki i środowisko są pomijane przez Git.
 ## Test regresji
 
 ```bash
-python -m unittest testy_kumiki.test_geometria -v
+python -m unittest testy_kumiki.test_geometria testy_kumiki.test_polaczenia -v
 ```
 
 Test odczytuje zapisane pliki OBJ, sprawdza ich wymiary i objętości po

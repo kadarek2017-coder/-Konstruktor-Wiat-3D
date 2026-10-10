@@ -1,0 +1,98 @@
+[
+  {
+    "id": "czop_gniazdo",
+    "name": "Czop i gniazdo",
+    "category": "Ciesielskie i stolarskie",
+    "description": "Słup–belka lub ramiak–poprzeczka. Czop wchodzi w dopasowane gniazdo.",
+    "parameters": "Przykład: słup 200×200, belka 100×200, czop 150×33,33 mm.",
+    "status": "gotowy_przyklad"
+  },
+  {
+    "id": "pol_drewna",
+    "name": "Pół drewna",
+    "category": "Ciesielskie i stolarskie",
+    "description": "Skrzyżowanie dwóch elementów z usunięciem połowy wysokości w każdym.",
+    "parameters": "Przykład: dwie belki 1200×100×200 mm, wycięcie 100 mm głębokości.",
+    "status": "gotowy_przyklad"
+  },
+  {
+    "id": "wrab",
+    "name": "Wrąb",
+    "category": "Ciesielskie",
+    "description": "Oparcie belki lub krokwi na dopasowanym wycięciu.",
+    "parameters": "Głębokość, szerokość i kąt wrębu.",
+    "status": "katalog"
+  },
+  {
+    "id": "miecz_czop",
+    "name": "Miecz na czop",
+    "category": "Ciesielskie",
+    "description": "Ukośny miecz z czopami i gniazdami w słupie oraz belce.",
+    "parameters": "Kąt miecza, czopy, głębokości gniazd.",
+    "status": "katalog"
+  },
+  {
+    "id": "nakladka",
+    "name": "Nakładka wzdłużna",
+    "category": "Ciesielskie",
+    "description": "Przedłużenie dwóch elementów w jednej osi.",
+    "parameters": "Długość zakładu i głębokość wycięć.",
+    "status": "katalog"
+  },
+  {
+    "id": "jaskolczy",
+    "name": "Jaskółczy ogon",
+    "category": "Ciesielskie i stolarskie",
+    "description": "Połączenie o trapezowym czopie i gnieździe.",
+    "parameters": "Kąt, szerokość i długość czopa.",
+    "status": "katalog"
+  },
+  {
+    "id": "czop_podwojny",
+    "name": "Czop podwójny",
+    "category": "Stolarskie",
+    "description": "Dwa czopy i dwa odpowiadające im gniazda.",
+    "parameters": "Szerokości czopów, rozstaw i głębokość.",
+    "status": "katalog"
+  },
+  {
+    "id": "kolki",
+    "name": "Kołki drewniane",
+    "category": "Stolarskie",
+    "description": "Połączenie przez kołki w dopasowanych otworach.",
+    "parameters": "Średnica, liczba, rozstaw i głębokość otworów.",
+    "status": "katalog"
+  },
+  {
+    "id": "wpust_pioro",
+    "name": "Wpust i pióro",
+    "category": "Stolarskie",
+    "description": "Pióro jednego elementu wchodzi we wpust drugiego.",
+    "parameters": "Grubość pióra i głębokość wpustu.",
+    "status": "katalog"
+  },
+  {
+    "id": "obce_pioro",
+    "name": "Obce pióro",
+    "category": "Stolarskie",
+    "description": "Osobna listwa łączy wpusty dwóch elementów.",
+    "parameters": "Wymiary listwy i dwóch wpustów.",
+    "status": "katalog"
+  },
+  {
+    "id": "zakladka",
+    "name": "Zakładka",
+    "category": "Stolarskie",
+    "description": "Elementy łączą się na dopasowanych zakładkach.",
+    "parameters": "Długość zakładu i grubość pozostawionego materiału.",
+    "status": "katalog"
+  },
+  {
+    "id": "wczepy",
+    "name": "Wczepy proste",
+    "category": "Stolarskie",
+    "description": "Naprzemienne prostokątne wczepy w narożniku.",
+    "parameters": "Liczba, szerokość i głębokość wczepów.",
+    "status": "katalog"
+  }
+]

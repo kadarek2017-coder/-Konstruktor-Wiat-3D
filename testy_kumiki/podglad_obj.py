@@ -16,7 +16,7 @@ import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Podgląd Kumiki 3D", page_icon="🪚", layout="wide")
 st.title("🪚 Podgląd Kumiki 3D")
-st.caption("Wersja podglądu 9 — liczba sztuk, graficzny katalog i zapis projektu")
+st.caption("Wersja podglądu 10 — dokładne pozycjonowanie i baza połączeń")
 
 app_dir = Path(__file__).resolve().parent
 base = app_dir / "wyniki"
@@ -118,6 +118,21 @@ st.table([
     for name, mesh in meshes.items()
 ])
 
+# Przykłady są wycinane i sprawdzane w Kumiki, a nie imitowane nakładką graficzną.
+sys.path.insert(0, str(app_dir))
+try:
+    from baza_polaczen import read_catalog, example_objects
+finally:
+    sys.path.pop(0)
+
+@st.cache_data
+def load_joint_examples():
+    return example_objects()
+
+joint_catalog = read_catalog()
+joint_examples = load_joint_examples()
+
+
 html = """
 <div id="wrap" style="position:relative;width:100%;height:760px;border-radius:12px;overflow:hidden;background:#e9e5dd">
  <style>
@@ -137,10 +152,11 @@ html = """
  </style>
  <div id="view" style="width:100%;height:100%"></div>
  <div style="position:absolute;left:14px;top:14px;background:rgba(255,255,255,.93);padding:10px 13px;border-radius:9px;font:14px -apple-system,BlinkMacSystemFont,sans-serif">
-  <b>Kumiki — rama i połączenia · wersja 9</b><br>
+  <b>Kumiki — rama i połączenia · wersja 10</b><br>
   Wybierz kafelek lub chwyć element w widoku i przeciągnij.<br>
   Przeciąganie tła: obrót widoku · rolka: zoom · prawy: przesuwanie widoku
  </div>
+ <div id="measurement" style="position:absolute;left:14px;top:100px;background:rgba(255,255,255,.94);padding:7px;border-radius:6px;font:13px sans-serif" hidden></div>
  <aside id="parts-panel" aria-label="Graficzny wybór elementów">
   <details open><summary>Katalog — dodaj element</summary>
    <p style="margin:4px 0">Przeciągnij kafelek do widoku 3D albo kliknij, aby dodać.</p>
@@ -153,6 +169,25 @@ html = """
    <label><input id="custom-size" type="checkbox"> Użyj powyższych wymiarów</label>
    <div id="catalog" class="part-grid" style="margin-top:8px"></div>
    <small>Nowe części mają pełny przekrój. Wycięcia połączeń nie są przeliczane przy przesuwaniu.</small>
+  </details>
+  <details><summary>Dokładne ustawienie</summary>
+   <button id="pin-reference" type="button">Użyj zaznaczonego jako odniesienia</button>
+   <p id="reference-name">Odniesienie: brak</p>
+   <label><input id="relative-add" type="checkbox"> Dodawaj względem odniesienia</label><br>
+   <label>Kierunek <select id="relative-axis"><option value="x">X — wzdłuż</option><option value="y">Y — w bok</option><option value="z">Z — w górę</option></select></label><br>
+   <label>Odległość <input id="relative-distance" type="number" value="2000" step="10" style="width:75px"> mm</label><br>
+   <label>Pomiar <select id="relative-measure"><option value="centers">Między środkami</option><option value="edges">Prześwit między krawędziami</option></select></label><br>
+   <label><input id="align-bottom" type="checkbox" checked> Wyrównaj spód (dla kierunków X/Y)</label><br>
+   <label>Rozstaw serii <input id="relative-step" type="number" value="2000" min="1" step="10" style="width:75px"> mm</label><br>
+   <button id="position-selected" type="button">Ustaw zaznaczony element</button>
+   <small>Odległość ujemna ustawia część w przeciwnym kierunku. To dokładne ustawienie jednorazowe; później możesz przeciągać części niezależnie.</small>
+  </details>
+  <details><summary>Baza połączeń</summary>
+   <label>Kategoria <select id="joint-filter"><option value="all">Wszystkie</option><option value="Ciesielskie">Ciesielskie</option><option value="Stolarskie">Stolarskie</option></select></label>
+   <div id="joint-catalog" class="part-grid" style="margin-top:8px"></div>
+   <p id="joint-info">Wybierz połączenie, aby zobaczyć opis i dostępność.</p>
+   <button id="add-joint-example" type="button" disabled>Dodaj przykład z wycięciami</button>
+   <small>Przykłady dodają dwa nowe dopasowane elementy. Nie zmieniają wycięć dowolnej zaznaczonej pary.</small>
   </details>
   <details open><summary>Elementy w modelu</summary><div id="model-parts" class="part-grid"></div></details>
   <p id="model-counts" style="margin:8px 0"></p>
@@ -191,6 +226,8 @@ import { TransformControls } from 'https://cdn.jsdelivr.net/npm/three@0.180.0/ex
 const objTexts = __OBJS__;
 const labels = __LABELS__;
 const modelConfig = __MODEL__;
+const jointCatalog=__JOINTS__;
+const jointObjTexts=__EXAMPLES__;
 const host=document.getElementById('view');
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0xe9e5dd);
@@ -271,6 +308,52 @@ transform.addEventListener('dragging-changed',event=>{controls.enabled=!event.va
 const select=document.getElementById('selected');
 labels.forEach((label,i)=>{const option=document.createElement('option');option.value=String(i);option.textContent=label;select.appendChild(option);});
 let selected=null;
+let reference=null;
+const dimensionLine=new THREE.Line(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:0x176bb0,depthTest:false}));
+dimensionLine.renderOrder=10;dimensionLine.visible=false;scene.add(dimensionLine);
+function updateDimension(){
+ const badge=document.getElementById('measurement');
+ dimensionLine.visible=Boolean(reference&&selected&&reference!==selected&&reference.visible&&selected.visible);
+ badge.hidden=!dimensionLine.visible;if(!dimensionLine.visible)return;
+ group.updateMatrixWorld(true);
+ const a=new THREE.Box3().setFromObject(reference),b=new THREE.Box3().setFromObject(selected);
+ const p=a.getCenter(new THREE.Vector3()),q=b.getCenter(new THREE.Vector3());
+ const axis=document.getElementById('relative-axis').value;
+ let value=q[axis]-p[axis];const sign=value<0?-1:1;
+ const edges=document.getElementById('relative-measure').value==='edges';
+ if(edges){p[axis]+=sign*(a.max[axis]-a.min[axis])/2;q[axis]-=sign*(b.max[axis]-b.min[axis])/2;value=q[axis]-p[axis];}
+ const end=p.clone();end[axis]=q[axis];
+ dimensionLine.geometry.setFromPoints([p,end,q]);
+ badge.textContent=(edges?'Krawędzie':'Środki')+' · '+axis.toUpperCase()+': '+value.toFixed(1)+' mm';
+}
+
+document.getElementById('pin-reference').addEventListener('click',()=>{
+ if(!selected){document.getElementById('part-status').textContent='Najpierw zaznacz element odniesienia.';return;}
+ reference=selected;document.getElementById('reference-name').textContent='Odniesienie: '+labels[group.children.indexOf(reference)];
+});
+function relativePosition(part,serial=0){
+ if(!reference||reference===part)throw new Error('Wskaż inny element odniesienia.');
+ const axis=document.getElementById('relative-axis').value;
+ const distance=Number(document.getElementById('relative-distance').value);
+ const step=Number(document.getElementById('relative-step').value);
+ if(!['x','y','z'].includes(axis)||!Number.isFinite(distance)||Math.abs(distance)>100000||!Number.isFinite(step)||step<=0||step>100000)throw new Error('Sprawdź odległość i rozstaw serii (do 100000 mm).');
+ group.updateMatrixWorld(true);part.updateMatrixWorld(true);
+ const a=new THREE.Box3().setFromObject(reference),b=new THREE.Box3().setFromObject(part);
+ const ac=a.getCenter(new THREE.Vector3()),bc=b.getCenter(new THREE.Vector3());
+ const desired=ac.clone();const signed=distance+serial*step;
+ desired[axis]+=signed;
+ if(document.getElementById('relative-measure').value==='edges')desired[axis]+=(signed<0?-1:1)*((a.max[axis]-a.min[axis]+b.max[axis]-b.min[axis])/2);
+ if(axis!=='z'&&document.getElementById('align-bottom').checked)desired.z=a.min.z+(b.max.z-b.min.z)/2;
+ const worldOrigin=part.getWorldPosition(new THREE.Vector3()).add(desired.sub(bc));
+ return group.worldToLocal(worldOrigin);
+}
+document.getElementById('position-selected').addEventListener('click',()=>{
+ try{
+  if(!selected)throw new Error('Zaznacz element do ustawienia.');
+  selected.position.copy(relativePosition(selected));syncInputs();
+  document.getElementById('part-status').textContent='Ustawiono element w podanej odległości. Wymiary w mm.';
+ }catch(error){document.getElementById('part-status').textContent=error.message;}
+});
 const partCards=[];
 const basePartCount=group.children.length;
 const baseLabels=labels.slice();
@@ -349,6 +432,7 @@ function addCatalogPart(type,event=null){
   if(!Number.isInteger(count)||count<1||count>100)throw new Error('Liczba sztuk musi być całkowita: od 1 do 100.');
   if(group.children.length+count>500)throw new Error('Projekt może zawierać maksymalnie 500 elementów.');
   const first=catalogPart(type);
+  if(document.getElementById('relative-add').checked)relativePosition(first);
   let position=controls.target.clone();
   if(event){
    pointerRay(event);
@@ -359,7 +443,8 @@ function addCatalogPart(type,event=null){
   const spacing=new THREE.Box3().setFromObject(first).getSize(new THREE.Vector3()).y+150;
   for(let i=0;i<count;i++){
    const part=i===0?first:catalogPart(type,first.userData.definition.dimensions);
-   part.position.copy(origin).add(new THREE.Vector3(0,(i-(count-1)/2)*spacing,0));
+   if(document.getElementById('relative-add').checked)part.position.copy(relativePosition(part,i));
+   else part.position.copy(origin).add(new THREE.Vector3(0,(i-(count-1)/2)*spacing,0));
    part.userData.home=part.position.clone();part.userData.added=true;
    part.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
    group.add(part);
@@ -372,6 +457,75 @@ function addCatalogPart(type,event=null){
   document.getElementById('part-status').textContent='Dodano '+count+' szt.: '+catalog[type].label+'. Każdą część możesz przeciągnąć osobno.';
  }catch(error){document.getElementById('part-status').textContent=error.message;}
 }
+function jointPart(jointId,member){
+ const text=jointObjTexts[jointId]?.[member];if(!text)throw new Error('Nieznany przykład połączenia.');
+ const part=loader.parse(text);
+ const center=new THREE.Box3().setFromObject(part).getCenter(new THREE.Vector3());
+ part.traverse(o=>{if(o.isMesh){o.geometry.translate(-center.x,-center.y,-center.z);o.material=mats[member%2].clone();}});
+ part.userData.definition={joint:jointId,member};part.userData.exampleCenter=center;
+ return part;
+}
+function jointDiagram(id){
+ const shapes={
+  wrab:'<path d="M10 42h80v12H10z"/><path d="M20 35l48-27 8 14-22 12v8H40v-1L28 47z"/>',
+  miecz_czop:'<path d="M14 6h13v48H14zM14 6h75v13H14z"/><path d="M25 44l36-30 8 9-36 30z"/>',
+  nakladka:'<path d="M8 18h42v10h42v13H50V31H8z"/>',
+  jaskolczy:'<path d="M8 17h37l-6 9 6 9H8zM92 17H55l-6 9 6 9h37z"/>',
+  czop_podwojny:'<path d="M8 10h34v9h17v8H42v7h17v8H42v9H8zM67 10h24v41H67z"/>',
+  kolki:'<path d="M8 12h30v38H8zM65 12h28v38H65z"/><path d="M32 20h39v5H32zM32 36h39v5H32z"/>',
+  wpust_pioro:'<path d="M8 12h35v14h15v9H43v14H8zM91 12H66v37h25z"/>',
+  obce_pioro:'<path d="M8 12h29v37H8zM68 12h24v37H68z"/><path d="M30 26h46v9H30z"/>',
+  zakladka:'<path d="M8 15h55v12H37v16H8zM46 34h20V18h26v28H46z"/>',
+  wczepy:'<path d="M8 10h34v8h15v8H42v8h15v8H42v8H8zM91 10H65v40h26z"/>'
+ };
+ return '<svg viewBox="0 0 100 60" aria-hidden="true"><g fill="#d1a36a" stroke="#986b3d" stroke-width="1">'+(shapes[id]||'')+'</g></svg>';
+}
+let selectedJoint=null;
+const jointCards=[];
+jointCatalog.forEach(entry=>{
+ const card=document.createElement('button');card.type='button';card.className='part-card';
+ card.setAttribute('aria-pressed','false');
+ if(jointObjTexts[entry.id]){
+  const assembly=new THREE.Group();jointObjTexts[entry.id].forEach((text,i)=>{
+   const part=jointPart(entry.id,i);part.position.copy(part.userData.exampleCenter);
+   // Uwzględnij pozycję części w miniaturze całego węzła.
+   part.traverse(o=>{if(o.isMesh)o.geometry.translate(part.position.x,part.position.y,part.position.z);});
+   assembly.add(part);
+  });card.innerHTML=timberIcon(assembly);
+ }else card.innerHTML=jointDiagram(entry.id);
+ const title=document.createElement('span');title.textContent=entry.name;card.appendChild(title);
+ const status=document.createElement('small');status.textContent=jointObjTexts[entry.id]?'Wycięcia: przykład 3D':'Katalog — bez generatora';card.appendChild(status);
+ card.addEventListener('click',()=>{
+  selectedJoint=entry;
+  jointCards.forEach(({card,item})=>card.setAttribute('aria-pressed',String(item===entry)));
+  document.getElementById('joint-info').textContent=entry.category+'. '+entry.description+' '+entry.parameters;
+  document.getElementById('add-joint-example').disabled=!jointObjTexts[entry.id];
+ });
+ document.getElementById('joint-catalog').appendChild(card);jointCards.push({card,item:entry});
+});
+document.getElementById('joint-filter').addEventListener('change',event=>{
+ jointCards.forEach(({card,item})=>{card.hidden=event.target.value!=='all'&&!item.category.includes(event.target.value);});
+});
+document.getElementById('add-joint-example').addEventListener('click',()=>{
+ try{
+  if(!selectedJoint||!jointObjTexts[selectedJoint.id])throw new Error('Wybierz gotowy przykład połączenia.');
+  if(group.children.length+2>500)throw new Error('Projekt może zawierać maksymalnie 500 elementów.');
+  const id=selectedJoint.id;
+  const parts=[jointPart(id,0),jointPart(id,1)];
+  const assemblyCenter=new THREE.Box3();
+  parts.forEach(part=>{part.position.copy(part.userData.exampleCenter);assemblyCenter.expandByObject(part);});
+  const origin=assemblyCenter.getCenter(new THREE.Vector3());
+  group.updateMatrixWorld(true);const destination=group.worldToLocal(controls.target.clone());
+  parts.forEach((part,member)=>{
+   part.position.sub(origin).add(destination);part.userData.home=part.position.clone();part.userData.added=true;
+   part.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
+   group.add(part);const index=group.children.length-1;
+   labels.push((id==='czop_gniazdo'&&member===0?'Słup':'Belka')+' — '+selectedJoint.name+' '+(index+1));
+   registerPart(index);if(labels[index].startsWith('Belka'))beams.push(part);
+  });choose(group.children.length-2);fitAll();
+  document.getElementById('part-status').textContent='Dodano dwa elementy z rzeczywistymi wycięciami: '+selectedJoint.name;
+ }catch(error){document.getElementById('part-status').textContent=error.message;}
+});
 function fitAll(){
  group.updateMatrixWorld(true);
  const box=new THREE.Box3();group.children.filter(part=>part.visible).forEach(part=>box.expandByObject(part));
@@ -405,10 +559,11 @@ function loadProject(data){
    return null;
   }
   const def=entry.definition;
+  if(def&&typeof def.joint==='string'&&Number.isInteger(def.member)&&[0,1].includes(def.member))return jointPart(def.joint,def.member);
   if(!def||!Number.isInteger(def.type)||!catalog[def.type]||!Array.isArray(def.dimensions)||def.dimensions.length!==3||def.dimensions.some(n=>typeof n!=='number'))throw new Error('Projekt zawiera nieznany typ elementu.');
   return catalogPart(def.type,def.dimensions);
  });
- choose(-1);
+ choose(-1);reference=null;document.getElementById('reference-name').textContent='Odniesienie: brak';
  while(group.children.length>basePartCount){
   const part=group.children[group.children.length-1];group.remove(part);
   part.traverse(o=>{if(o.isMesh){o.geometry.dispose();o.material.dispose();}});
@@ -558,10 +713,10 @@ syncInputs();
 
 function resize(){const w=host.clientWidth;camera.aspect=w/760;camera.updateProjectionMatrix();renderer.setSize(w,760,false);}
 new ResizeObserver(resize).observe(host);
-function animate(){if(controls.enabled)controls.update();renderer.render(scene,camera);requestAnimationFrame(animate);}
+function animate(){if(controls.enabled)controls.update();updateDimension();renderer.render(scene,camera);requestAnimationFrame(animate);}
 animate();
 </script>
-""".replace("__OBJS__", obj_json).replace("__LABELS__", json.dumps(labels, ensure_ascii=False)).replace("__MODEL__", json.dumps({"beam_flat": beam_flat, "full_frame": full_frame, "skeleton": skeleton}))
+""".replace("__OBJS__", obj_json).replace("__LABELS__", json.dumps(labels, ensure_ascii=False)).replace("__JOINTS__", json.dumps(joint_catalog, ensure_ascii=False)).replace("__EXAMPLES__", json.dumps(joint_examples)).replace("__MODEL__", json.dumps({"beam_flat": beam_flat, "full_frame": full_frame, "skeleton": skeleton}))
 
 components.html(html,height=780,scrolling=False)
 st.info("Katalog dodaje pełne elementy bez wycięć. Zapisz projekt do JSON, aby zachować dodane części i ich położenie. Po odświeżeniu możesz go wczytać przy tych samych ustawieniach modelu. Przesuwanie i ukrywanie służy do oglądania połączeń. Pobieranie OBJ uwzględnia przesunięcie wybranego elementu. Odświeżenie widoku przywraca bazowy model; zapisany układ można wczytać z pliku JSON.")
