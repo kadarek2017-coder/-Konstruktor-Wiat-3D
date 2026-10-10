@@ -16,7 +16,7 @@ import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Podgląd Kumiki 3D", page_icon="🪚", layout="wide")
 st.title("🪚 Podgląd Kumiki 3D")
-st.caption("Wersja podglądu 8 — graficzny katalog, dodawanie i przeciąganie elementów")
+st.caption("Wersja podglądu 9 — liczba sztuk, graficzny katalog i zapis projektu")
 
 app_dir = Path(__file__).resolve().parent
 base = app_dir / "wyniki"
@@ -137,7 +137,7 @@ html = """
  </style>
  <div id="view" style="width:100%;height:100%"></div>
  <div style="position:absolute;left:14px;top:14px;background:rgba(255,255,255,.93);padding:10px 13px;border-radius:9px;font:14px -apple-system,BlinkMacSystemFont,sans-serif">
-  <b>Kumiki — rama i połączenia · wersja 8</b><br>
+  <b>Kumiki — rama i połączenia · wersja 9</b><br>
   Wybierz kafelek lub chwyć element w widoku i przeciągnij.<br>
   Przeciąganie tła: obrót widoku · rolka: zoom · prawy: przesuwanie widoku
  </div>
@@ -149,11 +149,16 @@ html = """
     <label>Szerokość <input id="part-width" type="number" min="10" max="1000" step="10" value="100"> mm</label>
     <label>Wysokość <input id="part-height" type="number" min="10" max="1000" step="10" value="200"> mm</label>
    </div>
+   <label>Liczba sztuk <input id="part-count" type="number" min="1" max="100" step="1" value="1" style="width:55px"></label><br>
    <label><input id="custom-size" type="checkbox"> Użyj powyższych wymiarów</label>
    <div id="catalog" class="part-grid" style="margin-top:8px"></div>
    <small>Nowe części mają pełny przekrój. Wycięcia połączeń nie są przeliczane przy przesuwaniu.</small>
   </details>
   <details open><summary>Elementy w modelu</summary><div id="model-parts" class="part-grid"></div></details>
+  <p id="model-counts" style="margin:8px 0"></p>
+  <button id="save-project" type="button">Zapisz projekt</button>
+  <button id="load-project" type="button">Wczytaj projekt</button>
+  <input id="project-file" type="file" accept=".json,application/json" hidden>
   <div id="part-status" role="status" aria-live="polite" style="margin-top:8px"></div>
  </aside>
  <div style="position:absolute;left:14px;right:14px;bottom:14px;background:rgba(255,255,255,.93);padding:12px;border-radius:9px;font:14px -apple-system,BlinkMacSystemFont,sans-serif">
@@ -169,6 +174,7 @@ html = """
    <label>Z <input id="move-z" type="number" value="0" step="10" style="width:75px"> mm</label>
    <button id="reset-part" type="button">Przywróć element</button>
    <button id="hide-part" type="button">Ukryj element</button>
+   <button id="fit-all" type="button">Pokaż wszystkie elementy</button>
    <button id="reset-all" type="button">Złóż całą ramę</button>
    <button id="download-part" type="button">Pobierz element OBJ</button>
   </div>
@@ -184,6 +190,7 @@ import { TransformControls } from 'https://cdn.jsdelivr.net/npm/three@0.180.0/ex
 
 const objTexts = __OBJS__;
 const labels = __LABELS__;
+const modelConfig = __MODEL__;
 const host=document.getElementById('view');
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0xe9e5dd);
@@ -265,6 +272,8 @@ const select=document.getElementById('selected');
 labels.forEach((label,i)=>{const option=document.createElement('option');option.value=String(i);option.textContent=label;select.appendChild(option);});
 let selected=null;
 const partCards=[];
+const basePartCount=group.children.length;
+const baseLabels=labels.slice();
 function timberIcon(part){
  // Miniatura rzeczywistej siatki OBJ: rzut izometryczny, osobny od kamery sceny.
  const vertices=[];const faces=[];
@@ -323,35 +332,112 @@ const catalog=[
  {label:'Krokiew',length:3500,width:80,height:180,axis:'x',angle:-12},
  {label:'Płatew',length:3000,width:140,height:200,axis:'x',angle:0}
 ];
-function catalogPart(type){
+function catalogPart(type,dimensions=null){
  const spec=catalog[type];const custom=document.getElementById('custom-size').checked;
- const dims=['length','width','height'].map(key=>custom?Number(document.getElementById('part-'+key).value):spec[key]);
+ const dims=dimensions||['length','width','height'].map(key=>custom?Number(document.getElementById('part-'+key).value):spec[key]);
  if(dims.some((n,i)=>!Number.isFinite(n)||n<(i===0?50:10)||n>(i===0?20000:1000)))throw new Error('Sprawdź wymiary: długość 50–20000 mm, przekrój 10–1000 mm.');
  const [length,width,height]=dims;
  const geometry=new THREE.BoxGeometry(...(spec.axis==='z'?[width,height,length]:[length,width,height]));
  geometry.rotateY(spec.angle*Math.PI/180);
  const part=new THREE.Group();part.add(new THREE.Mesh(geometry,mats[spec.axis==='z'?0:1].clone()));
+ part.userData.definition={type,dimensions:dims};
  return part;
 }
 function addCatalogPart(type,event=null){
  try{
-  const part=catalogPart(type);
+  const count=Number(document.getElementById('part-count').value);
+  if(!Number.isInteger(count)||count<1||count>100)throw new Error('Liczba sztuk musi być całkowita: od 1 do 100.');
+  if(group.children.length+count>500)throw new Error('Projekt może zawierać maksymalnie 500 elementów.');
+  const first=catalogPart(type);
   let position=controls.target.clone();
   if(event){
    pointerRay(event);
    const plane=new THREE.Plane().setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()),position);
    const hit=raycaster.ray.intersectPlane(plane,new THREE.Vector3());if(hit)position=hit;
   }
-  group.updateMatrixWorld(true);part.position.copy(group.worldToLocal(position));
-  part.userData.home=part.position.clone();part.userData.added=true;
-  part.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
-  group.add(part);
-  const index=group.children.length-1;labels.push(catalog[type].label+' '+(index+1));
-  if(catalog[type].label.startsWith('Belka'))beams.push(part);
-  registerPart(index);choose(index);
-  document.getElementById('part-status').textContent='Dodano: '+labels[index]+'. Chwyć element w widoku i przeciągnij.';
+  group.updateMatrixWorld(true);const origin=group.worldToLocal(position);
+  const spacing=new THREE.Box3().setFromObject(first).getSize(new THREE.Vector3()).y+150;
+  for(let i=0;i<count;i++){
+   const part=i===0?first:catalogPart(type,first.userData.definition.dimensions);
+   part.position.copy(origin).add(new THREE.Vector3(0,(i-(count-1)/2)*spacing,0));
+   part.userData.home=part.position.clone();part.userData.added=true;
+   part.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
+   group.add(part);
+   const index=group.children.length-1;labels.push(catalog[type].label+' '+(index+1));
+   if(catalog[type].label.startsWith('Belka'))beams.push(part);
+   registerPart(index);
+  }
+  choose(group.children.length-count);
+  if(count>1)fitAll();
+  document.getElementById('part-status').textContent='Dodano '+count+' szt.: '+catalog[type].label+'. Każdą część możesz przeciągnąć osobno.';
  }catch(error){document.getElementById('part-status').textContent=error.message;}
 }
+function fitAll(){
+ group.updateMatrixWorld(true);
+ const box=new THREE.Box3();group.children.filter(part=>part.visible).forEach(part=>box.expandByObject(part));
+ if(box.isEmpty())return;
+ const target=box.getCenter(new THREE.Vector3()),size=box.getSize(new THREE.Vector3());
+ const direction=camera.position.clone().sub(controls.target).normalize();
+ const radius=Math.max(size.length()/2,100);
+ const distance=radius/Math.sin(Math.atan(Math.tan(camera.fov*Math.PI/360)*Math.min(camera.aspect,1)))*1.15;
+ controls.target.copy(target);camera.position.copy(target).addScaledVector(direction,distance);
+ camera.far=Math.max(20000,distance*4);camera.updateProjectionMatrix();controls.update();
+}
+document.getElementById('fit-all').addEventListener('click',fitAll);
+function saveProject(){
+ const data={format:'kumiki-layout',version:1,model:modelConfig,
+  parts:group.children.map((part,i)=>({label:labels[i],position:part.position.toArray(),home:part.userData.home.toArray(),visible:part.visible,
+   definition:part.userData.added?part.userData.definition:null}))};
+ const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+ const link=document.createElement('a');link.href=url;link.download='projekt-wiaty.json';link.click();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+ document.getElementById('part-status').textContent='Zapisano układ, wymiary i widoczność elementów w pliku projektu.';
+}
+function loadProject(data){
+ if(!data||data.format!=='kumiki-layout'||data.version!==1||!Array.isArray(data.parts)||data.parts.length<basePartCount||data.parts.length>500)throw new Error('Nieprawidłowy plik projektu.');
+ if(!data.model||Object.keys(modelConfig).some(key=>data.model[key]!==modelConfig[key]))throw new Error('Najpierw ustaw te same opcje: belka płasko, pełna rama i szkielet przestrzenny, co w zapisanym projekcie.');
+ const vector=value=>Array.isArray(value)&&value.length===3&&value.every(n=>typeof n==='number'&&Number.isFinite(n)&&Math.abs(n)<=1000000);
+ // Sprawdź całość przed zastąpieniem bieżącego układu.
+ const staged=data.parts.map((entry,i)=>{
+  if(!entry||typeof entry.label!=='string'||entry.label.length>100||typeof entry.visible!=='boolean'||!vector(entry.position)||!vector(entry.home))throw new Error('Projekt zawiera błędne dane elementu.');
+  if(i<basePartCount){
+   if(entry.label!==baseLabels[i]||entry.definition!==null||new THREE.Vector3(...entry.home).distanceTo(group.children[i].userData.home)>.001)throw new Error('Projekt nie pasuje do elementów bazowych.');
+   return null;
+  }
+  const def=entry.definition;
+  if(!def||!Number.isInteger(def.type)||!catalog[def.type]||!Array.isArray(def.dimensions)||def.dimensions.length!==3||def.dimensions.some(n=>typeof n!=='number'))throw new Error('Projekt zawiera nieznany typ elementu.');
+  return catalogPart(def.type,def.dimensions);
+ });
+ choose(-1);
+ while(group.children.length>basePartCount){
+  const part=group.children[group.children.length-1];group.remove(part);
+  part.traverse(o=>{if(o.isMesh){o.geometry.dispose();o.material.dispose();}});
+ }
+ labels.length=basePartCount;
+ staged.forEach((part,i)=>{if(part){group.add(part);labels.push(data.parts[i].label);part.userData.added=true;}});
+ data.parts.forEach((entry,i)=>{
+  const part=group.children[i];part.position.fromArray(entry.position);part.visible=entry.visible;
+  if(i>=basePartCount)part.userData.home=new THREE.Vector3(...entry.home);
+  part.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
+ });
+ beams.length=0;group.children.forEach((part,i)=>{if(labels[i].startsWith('Belka'))beams.push(part);});
+ select.replaceChildren();const placeholder=document.createElement('option');placeholder.value='-1';placeholder.textContent='Wybierz element…';select.appendChild(placeholder);
+ document.getElementById('model-parts').replaceChildren();partCards.length=0;
+ group.children.forEach((part,i)=>registerPart(i));choose(-1);fitAll();
+ document.getElementById('part-status').textContent='Wczytano projekt: '+group.children.length+' elementów.';
+}
+document.getElementById('save-project').addEventListener('click',saveProject);
+const projectFile=document.getElementById('project-file');
+document.getElementById('load-project').addEventListener('click',()=>projectFile.click());
+projectFile.addEventListener('change',async()=>{
+ const file=projectFile.files[0];if(!file)return;
+ try{
+  if(file.size>2000000)throw new Error('Plik projektu jest zbyt duży.');
+  loadProject(JSON.parse(await file.text()));
+ }catch(error){document.getElementById('part-status').textContent=error.message;}
+ finally{projectFile.value='';}
+});
+
 catalog.forEach((spec,type)=>{
  const card=document.createElement('button');card.type='button';card.className='part-card';card.draggable=true;
  card.innerHTML=timberIcon(catalogPart(type));
@@ -362,6 +448,8 @@ catalog.forEach((spec,type)=>{
  document.getElementById('catalog').appendChild(card);
 });
 function syncInputs(){
+ const totals=[['Słup','Słupy'],['Belka','Belki'],['Miecz','Miecze'],['Krokiew','Krokwie'],['Płatew','Płatwie']];
+ document.getElementById('model-counts').textContent=totals.map(([prefix,name])=>name+': '+labels.filter(label=>label.startsWith(prefix)).length).join(' · ');
  for(const axis of ['x','y','z']){
   const input=document.getElementById('move-'+axis);
   input.disabled=!selected;
@@ -473,7 +561,7 @@ new ResizeObserver(resize).observe(host);
 function animate(){if(controls.enabled)controls.update();renderer.render(scene,camera);requestAnimationFrame(animate);}
 animate();
 </script>
-""".replace("__OBJS__", obj_json).replace("__LABELS__", json.dumps(labels, ensure_ascii=False))
+""".replace("__OBJS__", obj_json).replace("__LABELS__", json.dumps(labels, ensure_ascii=False)).replace("__MODEL__", json.dumps({"beam_flat": beam_flat, "full_frame": full_frame, "skeleton": skeleton}))
 
 components.html(html,height=780,scrolling=False)
-st.info("Katalog dodaje pełne elementy bez wycięć. Dodane części i ich położenie są tymczasowe — odświeżenie widoku je usuwa. Przesuwanie i ukrywanie służy do oglądania połączeń. Pobieranie OBJ uwzględnia przesunięcie wybranego elementu. Odświeżenie widoku przywraca złożoną ramę.")
+st.info("Katalog dodaje pełne elementy bez wycięć. Zapisz projekt do JSON, aby zachować dodane części i ich położenie. Po odświeżeniu możesz go wczytać przy tych samych ustawieniach modelu. Przesuwanie i ukrywanie służy do oglądania połączeń. Pobieranie OBJ uwzględnia przesunięcie wybranego elementu. Odświeżenie widoku przywraca bazowy model; zapisany układ można wczytać z pliku JSON.")

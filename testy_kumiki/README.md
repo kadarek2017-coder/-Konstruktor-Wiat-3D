@@ -17,7 +17,7 @@ python -m streamlit run testy_kumiki/podglad_obj.py
 
 Jeśli środowisko już istnieje, zacznij od polecenia `source`.
 
-W podglądzie wersji 8 przycisk **Wygeneruj poprawiony model** uruchamia
+W podglądzie wersji 9 przycisk **Wygeneruj poprawiony model** uruchamia
 generator tym samym Pythonem co Streamlit i od razu wczytuje nowe pliki.
 Każde wyświetlenie sprawdza geometrię OBJ, w tym orientację przekroju
 czopa. Stary, błędny model jest blokowany, nawet jeśli pozostał po nim
@@ -91,7 +91,7 @@ python testy_kumiki/generuj_czop.py --skeleton --flat
 
 ## Graficzny wybór i katalog części
 
-W wersji 8 panel po prawej zawiera graficzne kafelki wszystkich elementów
+W wersji 9 panel po prawej zawiera graficzne kafelki wszystkich elementów
 modelu. Miniatury powstają z ich rzeczywistej siatki. Kliknij kafelek,
 aby zaznaczyć część (również ukrytą), potem chwyć ją w scenie i przeciągnij.
 Zaznaczenie jest widoczne na kafelku i na modelu; ukryte części mają
@@ -110,9 +110,21 @@ Nie dopasowuje automatycznie czopów i gniazd ani nie sprawdza kolizji
 nowych części. Źródłowe połączenia ram pozostają w geometrii OBJ.
 
 Nowe części można zaznaczać, ukrywać, przywracać i pobierać jako OBJ.
-Dodane części i wszystkie przesunięcia są tymczasowe: odświeżenie,
-generowanie lub przełączenie wariantu odtwarza bazowy model.
-Zapis i odczyt własnego układu będzie osobnym etapem.
+Pole **Liczba sztuk** dotyczy klikniętego lub przeciągniętego typu:
+wpisz np. 6 i wybierz słup, aby dodać sześć niezależnych słupów.
+Liczba musi być całkowita, od 1 do 100; projekt mieści do 500 części.
+Serie układają się obok siebie w osi Y z odstępem 150 mm między
+przekrojami. Kamera pokazuje cały układ po dodaniu serii; możesz
+też użyć **Pokaż wszystkie elementy**. Licznik obejmuje także ukryte części.
+
+**Zapisz projekt** pobiera plik `projekt-wiaty.json` zawierający wymiary
+nowych części, pozycje, pozycje przywracania i widoczność wszystkich
+elementów. **Wczytaj projekt** zastępuje bieżący układ zapisanym.
+Przed wczytaniem ustaw te same opcje belki płasko, pełnej ramy i
+szkieletu przestrzennego. Błędny lub niepasujący plik nie zastępuje układu.
+Odświeżenie, generowanie lub przełączenie wariantu odtwarza bazowy model,
+dlatego wcześniej zapisz własny układ. JSON przechowuje układ, a OBJ
+nadal służy do eksportowania geometrii pojedynczego elementu.
 
 ## Jednostki i położenie
 
