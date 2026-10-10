@@ -4,7 +4,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import plotly.graph_objects as go
 
-VERSION = "1.0"
+VERSION = "1.1"
 st.set_page_config(page_title=f"Konstruktor Wiat 3D v{VERSION}", page_icon="🏗️", layout="wide", initial_sidebar_state="collapsed")
 st.title(f"Konstruktor Wiat 3D v{VERSION}")
 st.caption("Parametryczny model drewnianej wiaty + ręczna biblioteka elementów 3D")
@@ -323,15 +323,52 @@ function roofH(y,x){{
  if(d.roof_type==='Płaski') return d.Hf;
  const half=d.W/2; return d.Hf+(d.ridge_h-d.Hf)*(1-Math.abs(x-half)/half);
 }}
+// Jedna belka = jedna ciągła bryła. BoxGeometry jest orientowane wzdłuż wektora p1->p2.
+function addMember(p1,p2,width,height,mat=wood){{
+ const a=new THREE.Vector3(...p1), b=new THREE.Vector3(...p2);
+ const dir=new THREE.Vector3().subVectors(b,a); const len=dir.length();
+ if(len<0.0001) return null;
+ const mesh=new THREE.Mesh(new THREE.BoxGeometry(width,len,height),mat);
+ mesh.position.copy(a).add(b).multiplyScalar(.5);
+ // lokalna oś Y bryły zostaje skierowana dokładnie wzdłuż elementu
+ mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir.clone().normalize());
+ mesh.castShadow=true; mesh.receiveShadow=true; scene.add(mesh); return mesh;
+}}
 addBox(d.W/2,d.L/2,-.06,d.W+1,d.L+1,.12,groundMat);
 d.posts.forEach(p=>{{const x=p["X [m]"],y=p["Y [m]"],h=roofH(y,x)-d.bh; addBox(x,y,h/2,d.pc,d.pc,h);}});
-const seg=32;
-[0,d.W].forEach(x=>{{for(let s=0;s<seg;s++){{const y0=d.L*s/seg,y1=d.L*(s+1)/seg,ym=(y0+y1)/2,z=roofH(ym,x)-d.bh/2; addBox(x,ym,z,d.bw,y1-y0,d.bh);}}}});
-[[0,d.Hf],[d.L,d.Hb]].forEach(v=>addBox(d.W/2,v[0],v[1]-d.bh/2,d.W+d.pc,d.bw,d.bh));
+
+// belki podłużne — po jednej pełnej bryle na bok
+[0,d.W].forEach(x=>{{
+ const z0=roofH(0,x)-d.bh/2, z1=roofH(d.L,x)-d.bh/2;
+ addMember([x,0,z0],[x,d.L,z1],d.bw,d.bh);
+}});
+// belki poprzeczne
+[[0,d.Hf],[d.L,d.Hb]].forEach(v=>addMember([-d.pc/2,v[0],v[1]-d.bh/2],[d.W+d.pc/2,v[0],v[1]-d.bh/2],d.bw,d.bh));
+
 if(d.rafter_direction==='W poprzek (X)'){{
- d.rafters.forEach(y=>{{if(d.roof_type==='Dwuspadowy'){{for(let s=0;s<seg;s++){{const x0=-d.overhang+(d.W+2*d.overhang)*s/seg,x1=-d.overhang+(d.W+2*d.overhang)*(s+1)/seg,xm=(x0+x1)/2,h=roofH(y,Math.max(0,Math.min(d.W,xm))); addBox(xm,y,h+d.rh/2,x1-x0,d.rw,d.rh);}}}}else{{const h=roofH(y,d.W/2);addBox(d.W/2,y,h+d.rh/2,d.W+2*d.overhang,d.rw,d.rh);}}}});
+ d.rafters.forEach(y=>{{
+   if(d.roof_type==='Dwuspadowy'){{
+     const slope=(d.ridge_h-d.Hf)/(d.W/2);
+     const ze=d.Hf-slope*d.overhang+d.rh/2, zr=d.ridge_h+d.rh/2;
+     addMember([-d.overhang,y,ze],[d.W/2,y,zr],d.rw,d.rh);
+     addMember([d.W/2,y,zr],[d.W+d.overhang,y,ze],d.rw,d.rh);
+   }} else {{
+     const h=roofH(y,d.W/2)+d.rh/2;
+     addMember([-d.overhang,y,h],[d.W+d.overhang,y,h],d.rw,d.rh);
+   }}
+ }});
 }} else {{
- d.rafters.forEach(x=>{{for(let s=0;s<seg;s++){{const y0=-d.overhang+(d.L+2*d.overhang)*s/seg,y1=-d.overhang+(d.L+2*d.overhang)*(s+1)/seg,ym=(y0+y1)/2,h=roofH(Math.max(0,Math.min(d.L,ym)),x);addBox(x,ym,h+d.rh/2,d.rw,y1-y0,d.rh);}}}});
+ d.rafters.forEach(x=>{{
+   let z0,z1;
+   if(d.roof_type==='Jednospadowy'){{
+     const slope=(d.Hb-d.Hf)/d.L;
+     z0=d.Hf-slope*d.overhang+d.rh/2;
+     z1=d.Hb+slope*d.overhang+d.rh/2;
+   }} else {{
+     z0=roofH(0,x)+d.rh/2; z1=z0;
+   }}
+   addMember([x,-d.overhang,z0],[x,d.L+d.overhang,z1],d.rw,d.rh);
+ }});
 }}
 const grid=new THREE.GridHelper(Math.max(d.W,d.L)+2,Math.ceil(Math.max(d.W,d.L)+2),0x8f8a80,0xc7c1b6); grid.rotation.x=Math.PI/2; grid.position.z=.005; scene.add(grid);
 function resize(){{const w=host.clientWidth;camera.aspect=w/760;camera.updateProjectionMatrix();renderer.setSize(w,760,false);}}
@@ -400,5 +437,5 @@ project={"version":VERSION,"roof_type":roof_type,"ridge_height_m":ridge_h,"width
 "rafter_cm":[rw*100,rh*100],"rafter_spacing_m":spacing,"overhang_m":overhang,
 "braces":braces,"brace_length_m":brace_len,"wood_material":base_wood,"wood_finish":base_finish,"wood_detail":wood_detail,"style_overrides":st.session_state.style_overrides,"custom_elements":st.session_state.custom_elements}
 st.download_button("💾 Zapisz projekt",json.dumps(project,indent=2,ensure_ascii=False),
-                   "wiata-v1.0.json","application/json")
+                   "wiata-v1.1.json","application/json")
 st.warning("Model służy do projektowania geometrii i zestawienia materiału. Nie zastępuje obliczeń konstrukcyjnych.")
