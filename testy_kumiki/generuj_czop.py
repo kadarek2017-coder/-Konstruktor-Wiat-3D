@@ -85,4 +85,37 @@ files = step(
 print("Wygenerowane pliki:")
 for p in files:
     print(" ", p)
-print("UWAGA: sprawdź wizualnie orientację i podcięcia przed użyciem w projekcie.")
+
+# Diagnostyka rzeczywistych współrzędnych zapisanych w OBJ.
+# Dzięki temu nie zgadujemy już orientacji osi Kumiki na podstawie podglądu.
+def obj_bounds(path):
+    vertices = []
+    with open(path, "r", encoding="utf-8", errors="ignore") as fh:
+        for line in fh:
+            if line.startswith("v "):
+                parts = line.split()
+                if len(parts) >= 4:
+                    vertices.append(tuple(float(v) for v in parts[1:4]))
+    if not vertices:
+        return None
+    mins = tuple(min(v[i] for v in vertices) for i in range(3))
+    maxs = tuple(max(v[i] for v in vertices) for i in range(3))
+    center = tuple((mins[i] + maxs[i]) / 2 for i in range(3))
+    size = tuple(maxs[i] - mins[i] for i in range(3))
+    return mins, maxs, center, size
+
+print("\n=== RZECZYWISTE GRANICE OBJ ===")
+for p in files:
+    bounds = obj_bounds(p)
+    if bounds is None:
+        print(f"{Path(p).name}: brak wierzchołków OBJ")
+        continue
+    mins, maxs, center, size = bounds
+    fmt = lambda xyz: "(" + ", ".join(f"{v:.1f}" for v in xyz) + ")"
+    print(f"{Path(p).name}:")
+    print(f"  MIN    X,Y,Z = {fmt(mins)}")
+    print(f"  MAX    X,Y,Z = {fmt(maxs)}")
+    print(f"  ŚRODEK X,Y,Z = {fmt(center)}")
+    print(f"  ROZMIAR X,Y,Z = {fmt(size)}")
+
+print("\nSkopiuj sekcję 'RZECZYWISTE GRANICE OBJ' — na jej podstawie ustawimy elementy dokładnie.")
