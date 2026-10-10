@@ -17,7 +17,7 @@ python -m streamlit run testy_kumiki/podglad_obj.py
 
 Jeśli środowisko już istnieje, zacznij od polecenia `source`.
 
-W podglądzie wersji 11 przycisk **Wygeneruj poprawiony model** uruchamia
+W podglądzie wersji 12 przycisk **Wygeneruj poprawiony model** uruchamia
 generator tym samym Pythonem co Streamlit i od razu wczytuje nowe pliki.
 Każde wyświetlenie sprawdza geometrię OBJ, w tym orientację przekroju
 czopa. Stary, błędny model jest blokowany, nawet jeśli pozostał po nim
@@ -91,7 +91,7 @@ python testy_kumiki/generuj_czop.py --skeleton --flat
 
 ## Graficzny wybór i katalog części
 
-W wersji 11 panel po prawej zawiera graficzne kafelki wszystkich elementów
+W wersji 12 panel po prawej zawiera graficzne kafelki wszystkich elementów
 modelu. Miniatury powstają z ich rzeczywistej siatki. Kliknij kafelek,
 aby zaznaczyć część (również ukrytą), potem chwyć ją w scenie i przeciągnij.
 Zaznaczenie jest widoczne na kafelku i na modelu; ukryte części mają
@@ -189,6 +189,22 @@ w poprzek. Luz montażowy oraz dowolne parametry czopa nie są jeszcze
 regulowane. Wycięcia pozostają w częściach po ich rozłączeniu i nie
 przeliczają się po zmianie położenia. Własne przeliczenia wykonuj ponownie
 na pełnych częściach, jeśli zmieniasz układ węzła.
+
+## Zaznaczanie dwóch części (wersja 12)
+
+Kliknij pierwszy element, przytrzymaj **Shift** i kliknij drugi element
+w scenie albo na jego kafelku. Pierwszy jest niebieski (A), drugi zielony (B).
+Zaznaczenie obu pozostaje widoczne po zmianie aktywnej części.
+Shift wybiera część bez jej przesuwania.
+
+Alternatywnie włącz **Zaznacz dwa elementy do połączenia** pod widokiem
+i kliknij kolejno dwie części bez Shift. Ten tryb służy do wybierania;
+wyłącz go, aby znów przeciągać części. W bazie połączeń są też listy
+**A** i **B** z wszystkimi częściami modelu, oraz **Wyczyść parę**.
+Nie można przypisać tej samej części do obu ról.
+
+Dla czopa wybierz słup jako A i belkę jako B, potem wybierz połączenie
+w bazie i kliknij **Wykonaj połączenie w A i B**.
 
 ## Jednostki i położenie
 

@@ -16,7 +16,7 @@ import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Podgląd Kumiki 3D", page_icon="🪚", layout="wide")
 st.title("🪚 Podgląd Kumiki 3D")
-st.caption("Wersja podglądu 11 — dokładne pozycjonowanie i baza połączeń")
+st.caption("Wersja podglądu 12 — dokładne pozycjonowanie i baza połączeń")
 
 app_dir = Path(__file__).resolve().parent
 base = app_dir / "wyniki"
@@ -152,8 +152,9 @@ html = """
  </style>
  <div id="view" style="width:100%;height:100%"></div>
  <div style="position:absolute;left:14px;top:14px;background:rgba(255,255,255,.93);padding:10px 13px;border-radius:9px;font:14px -apple-system,BlinkMacSystemFont,sans-serif">
-  <b>Kumiki — rama i połączenia · wersja 11</b><br>
-  Wybierz kafelek lub chwyć element w widoku i przeciągnij.<br>
+  <b>Kumiki — rama i połączenia · wersja 12</b><br>
+  Kliknij pierwszy element, Shift + kliknij drugi — wybór pary.<br>
+  Chwyć element bez Shift, aby go przeciągnąć.<br>
   Przeciąganie tła: obrót widoku · rolka: zoom · prawy: przesuwanie widoku
  </div>
  <div id="measurement" style="position:absolute;left:14px;top:100px;background:rgba(255,255,255,.94);padding:7px;border-radius:6px;font:13px sans-serif" hidden></div>
@@ -186,6 +187,9 @@ html = """
    <label>Kategoria <select id="joint-filter"><option value="all">Wszystkie</option><option value="Ciesielskie">Ciesielskie</option><option value="Stolarskie">Stolarskie</option></select></label>
    <div id="joint-catalog" class="part-grid" style="margin-top:8px"></div>
    <p id="joint-info">Wybierz połączenie, aby zobaczyć opis i dostępność.</p>
+   <label>A: <select id="joint-select-a"><option value="-1">Wybierz element A…</option></select></label><br>
+   <label>B: <select id="joint-select-b"><option value="-1">Wybierz element B…</option></select></label><br>
+   <button id="clear-joint-pair" type="button">Wyczyść parę</button><br>
    <button id="set-joint-a" type="button">Zaznaczony → element A</button>
    <button id="set-joint-b" type="button">Zaznaczony → element B</button>
    <p id="joint-pair">A: brak · B: brak</p>
@@ -207,6 +211,7 @@ html = """
   <button id="assemble" type="button">Złóż połączenie</button>
   <button id="separate" type="button">Rozsuń elementy</button>
   <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px">
+   <label><input id="pair-mode" type="checkbox"> Zaznacz dwa elementy do połączenia</label>
    <label><input id="show-arrows" type="checkbox"> Strzałki do precyzyjnego przesuwania</label>
    <label for="selected">Element:</label><select id="selected"><option value="-1">Wybierz element…</option></select>
    <label>X <input id="move-x" type="number" value="0" step="10" style="width:75px"> mm</label>
@@ -410,7 +415,10 @@ function registerPart(index){
  const size=new THREE.Box3();part.traverse(o=>{if(o.isMesh){o.geometry.computeBoundingBox();size.union(o.geometry.boundingBox);}});
  const dimensions=size.getSize(new THREE.Vector3()).toArray().map(Math.round).join(' × ');
  const detail=document.createElement('small');detail.textContent=dimensions+' mm';card.appendChild(detail);
- card.addEventListener('click',()=>choose(index));
+ card.addEventListener('click',event=>selectPart(index,event.shiftKey));
+ for(const id of ['joint-select-a','joint-select-b']){
+  const choice=document.createElement('option');choice.value=String(index);choice.textContent=labels[index];document.getElementById(id).appendChild(choice);
+ }
  document.getElementById('model-parts').appendChild(card);partCards.push(card);
 }
 group.children.forEach((part,index)=>registerPart(index));
@@ -497,13 +505,38 @@ function jointDiagram(id){
 let selectedJoint=null;
 let jointA=-1,jointB=-1;
 function syncPair(){
+ document.getElementById('joint-select-a').value=String(jointA);
+ document.getElementById('joint-select-b').value=String(jointB);
+ refreshSelection();
  document.getElementById('joint-pair').textContent='A: '+(labels[jointA]||'brak')+' · B: '+(labels[jointB]||'brak');
  document.getElementById('apply-joint').disabled=jointA<0||jointB<0||jointA===jointB||!selectedJoint||!jointObjTexts[selectedJoint.id];
 }
+function setPairMember(role,index){
+ if(role==='a'){jointA=index;if(jointB===index)jointB=-1;}
+ else{jointB=index;if(jointA===index)jointA=-1;}
+ if(index>=0)choose(index);syncPair();
+}
+for(const [id,role] of [['joint-select-a','a'],['joint-select-b','b']])document.getElementById(id).addEventListener('change',event=>setPairMember(role,Number(event.target.value)));
+document.getElementById('clear-joint-pair').addEventListener('click',()=>{jointA=-1;jointB=-1;syncPair();});
+document.getElementById('pair-mode').addEventListener('change',event=>{
+ if(event.target.checked){jointA=-1;jointB=-1;syncPair();}
+});
+function selectPart(index,additive=false){
+ if(additive){
+  if(jointA<0&&selected&&selected!==group.children[index])jointA=group.children.indexOf(selected);
+  if(index===jointA)jointA=-1;
+  else if(index===jointB)jointB=-1;
+  else if(jointA<0)jointA=index;
+  else jointB=index;
+ }else if(document.getElementById('pair-mode').checked){
+  if(jointA<0||jointB>=0){jointA=index;jointB=-1;}
+  else if(index!==jointA)jointB=index;
+ }
+ choose(index);syncPair();
+}
 for(const [id,role] of [['set-joint-a','a'],['set-joint-b','b']])document.getElementById(id).addEventListener('click',()=>{
  if(!selected){document.getElementById('part-status').textContent='Najpierw zaznacz element w modelu.';return;}
- if(role==='a')jointA=group.children.indexOf(selected);else jointB=group.children.indexOf(selected);
- syncPair();
+ setPairMember(role,group.children.indexOf(selected));
 });
 document.getElementById('apply-joint').addEventListener('click',()=>{
  if(jointA<0||jointB<0||jointA===jointB||!selectedJoint)return;
@@ -624,6 +657,9 @@ function loadProject(data){
  beams.length=0;group.children.forEach((part,i)=>{if(labels[i].startsWith('Belka'))beams.push(part);});
  select.replaceChildren();const placeholder=document.createElement('option');placeholder.value='-1';placeholder.textContent='Wybierz element…';select.appendChild(placeholder);
  document.getElementById('model-parts').replaceChildren();partCards.length=0;
+ for(const id of ['joint-select-a','joint-select-b']){
+  const list=document.getElementById(id);list.replaceChildren();const empty=document.createElement('option');empty.value='-1';empty.textContent='Wybierz element…';list.appendChild(empty);
+ }
  group.children.forEach((part,i)=>registerPart(i));choose(-1);fitAll();
  document.getElementById('part-status').textContent='Wczytano projekt: '+group.children.length+' elementów.';
 }
@@ -658,22 +694,30 @@ function syncInputs(){
  }
  for(const id of ['reset-part','hide-part','download-part'])document.getElementById(id).disabled=!selected;
  partCards.forEach((card,i)=>{
-  card.setAttribute('aria-pressed',String(group.children[i]===selected));
+  card.setAttribute('aria-pressed',String(group.children[i]===selected||i===jointA||i===jointB));
   card.style.opacity=group.children[i].visible?'1':'.45';
  });
  const beamOffset=beam.position.z-beam.userData.home.z;
  separation.value=String(Math.max(0,Math.min(500,beamOffset)));
  document.getElementById('distance').textContent=String(Math.round(beamOffset));
 }
+function refreshSelection(){
+ group.children.forEach((part,i)=>part.traverse(o=>{
+  if(o.isMesh)o.material.emissive.setHex(i===jointA?0x123b70:i===jointB?0x12552b:part===selected?0x302010:0x000000);
+ }));
+ partCards.forEach((card,i)=>{
+  card.setAttribute('aria-pressed',String(group.children[i]===selected||i===jointA||i===jointB));
+  card.style.borderColor=i===jointA?'#176bb0':i===jointB?'#218944':'';
+  card.title=(i===jointA?'Element A · ':i===jointB?'Element B · ':'')+labels[i];
+ });
+}
 function choose(index){
- group.children.forEach(part=>part.traverse(o=>{if(o.isMesh)o.material.emissive.setHex(0x000000);}));
  selected=index>=0?group.children[index]:null;
  select.value=String(index);
- if(selected){selected.visible=true;selected.traverse(o=>{if(o.isMesh)o.material.emissive.setHex(0x302010);});}
- updateArrows();
- syncInputs();
+ if(selected)selected.visible=true;
+ updateArrows();syncInputs();refreshSelection();
 }
-select.addEventListener('change',()=>choose(Number(select.value)));
+select.addEventListener('change',()=>selectPart(Number(select.value)));
 transform.addEventListener('objectChange',syncInputs);
 for(const axis of ['x','y','z'])document.getElementById('move-'+axis).addEventListener('change',event=>{
  const value=Number(event.target.value);
@@ -714,13 +758,18 @@ function pointerRay(event){
 canvas.addEventListener('pointerdown',event=>{
  if(event.button!==0||drag)return;
  // Uchwyt strzałki obsługuje TransformControls w swoim trybie.
- if(showArrows.checked&&transform.axis!==null)return;
+ if(!event.shiftKey&&!document.getElementById('pair-mode').checked&&showArrows.checked&&transform.axis!==null)return;
  pointerStart={id:event.pointerId,x:event.clientX,y:event.clientY};
  pointerRay(event);
  const hit=raycaster.intersectObjects(group.children.filter(part=>part.visible),true)[0];
  if(!hit)return;
  let part=hit.object;while(part.parent!==group)part=part.parent;
- choose(group.children.indexOf(part));
+ const index=group.children.indexOf(part);
+ if(event.shiftKey||document.getElementById('pair-mode').checked){
+  pointerStart=null;selectPart(index,event.shiftKey);
+  event.preventDefault();event.stopImmediatePropagation();return;
+ }
+ selectPart(index);
  const plane=new THREE.Plane().setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()),hit.point);
  drag={id:event.pointerId,part,plane,offset:part.getWorldPosition(new THREE.Vector3()).sub(hit.point),moved:false};
  // Listener w fazie capture blokuje obrót kamery przed obsługą OrbitControls.
