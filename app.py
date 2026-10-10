@@ -4,7 +4,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import plotly.graph_objects as go
 
-VERSION = "1.5"
+VERSION = "1.5.1"
 st.set_page_config(page_title=f"Konstruktor Wiat 3D v{VERSION}", page_icon="🏗️", layout="wide", initial_sidebar_state="collapsed")
 st.title(f"Konstruktor Wiat 3D v{VERSION}")
 st.caption("Parametryczny model drewnianej wiaty + ręczna biblioteka elementów 3D")
@@ -445,7 +445,7 @@ if(d.rafter_direction==='W poprzek (X)'){{
 // zaznaczanie elementów myszką
 const raycaster=new THREE.Raycaster(), pointer=new THREE.Vector2();
 let selected=null, selectedMaterial=null;
-const highlight=new THREE.MeshStandardMaterial({color:0xf2b84b,roughness:.55,metalness:0});
+const highlight=new THREE.MeshStandardMaterial({{color:0xf2b84b,roughness:.55,metalness:0}});
 const info=document.getElementById('selection-info');
 renderer.domElement.addEventListener('pointerdown',ev=>{{
  const r=renderer.domElement.getBoundingClientRect();
@@ -529,5 +529,5 @@ project={"version":VERSION,"roof_type":roof_type,"ridge_height_m":ridge_h,"width
 "rafter_cm":[rw*100,rh*100],"rafter_spacing_m":spacing,"overhang_m":overhang,
 "braces":braces,"brace_length_m":brace_len,"wood_material":base_wood,"wood_finish":base_finish,"wood_detail":wood_detail,"style_overrides":st.session_state.style_overrides,"custom_elements":st.session_state.custom_elements}
 st.download_button("💾 Zapisz projekt",json.dumps(project,indent=2,ensure_ascii=False),
-                   "wiata-v1.5.json","application/json")
+                   "wiata-v1.5.1.json","application/json")
 st.warning("Model służy do projektowania geometrii i zestawienia materiału. Nie zastępuje obliczeń konstrukcyjnych.")
