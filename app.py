@@ -4,7 +4,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import plotly.graph_objects as go
 
-VERSION = "1.3"
+VERSION = "1.4"
 st.set_page_config(page_title=f"Konstruktor Wiat 3D v{VERSION}", page_icon="🏗️", layout="wide", initial_sidebar_state="collapsed")
 st.title(f"Konstruktor Wiat 3D v{VERSION}")
 st.caption("Parametryczny model drewnianej wiaty + ręczna biblioteka elementów 3D")
@@ -14,6 +14,7 @@ WOOD_COLORS={"Świerk":"#B98A58","Sosna":"#C49A67","Modrzew":"#A96F43","Dąb":"#
 FINISH_COLORS={"Surowe":None,"Olej naturalny":"#9D7046","Impregnat jasny":"#A98055","Impregnat ciemny":"#65462F","Biały":"#DED9CE","Grafit":"#55575A"}
 if "custom_elements" not in st.session_state: st.session_state.custom_elements=[]
 if "style_overrides" not in st.session_state: st.session_state.style_overrides={}
+if "library_element" not in st.session_state: st.session_state.library_element="Słup"
 
 with st.sidebar:
     st.header("Wymiary")
@@ -109,9 +110,36 @@ if post_mode=="Ręczne":
 else:
     posts=auto_posts
 
-st.subheader("🧰 Biblioteka elementów")
-element_type=st.selectbox("Element do dodania",list(ELEMENT_LIBRARY.keys()))
+st.subheader("🧰 Graficzna biblioteka elementów")
+st.caption("Wybierz element po rysunku. Parametry wybranego elementu ustawisz poniżej.")
+
+LIBRARY_ICONS={
+ "Słup":"▥","Belka":"▰","Krokiew":"╱","Płatew":"━",
+ "Łata":"▬","Zastrzał":"╲","Blacha dachowa":"▱","Stopa / kotwa":"⌑"
+}
+LIBRARY_HINTS={
+ "Słup":"20×20 cm · pion","Belka":"10×20 cm · poziom","Krokiew":"8×18 cm · dach",
+ "Płatew":"10×20 cm · wzdłuż","Łata":"4×6 cm · dach","Zastrzał":"8×8 cm · ukośny",
+ "Blacha dachowa":"panel pokrycia","Stopa / kotwa":"mocowanie słupa"
+}
+cards=st.columns(4)
+for idx,name in enumerate(ELEMENT_LIBRARY):
+    with cards[idx%4]:
+        active=st.session_state.library_element==name
+        st.markdown(
+            f"""<div style="height:112px;border:2px solid {'#b7793f' if active else '#ddd3c6'};
+            border-radius:12px;padding:10px;text-align:center;background:{'#f6eee4' if active else '#faf9f7'}">
+            <div style="font-size:34px;line-height:38px;color:#8a603c">{LIBRARY_ICONS[name]}</div>
+            <b>{name}</b><br><span style="font-size:12px;color:#777">{LIBRARY_HINTS[name]}</span></div>""",
+            unsafe_allow_html=True
+        )
+        if st.button(("✓ " if active else "")+f"Wybierz {name}",key=f"lib_{name}",use_container_width=True):
+            st.session_state.library_element=name
+            st.rerun()
+
+element_type=st.session_state.library_element
 preset=ELEMENT_LIBRARY[element_type]
+st.info(f"Wybrano: **{element_type}** — {LIBRARY_HINTS[element_type]}")
 p1,p2,p3=st.columns(3)
 with p1: ex=st.number_input("X elementu [m]",0.0,float(W),0.0,.1)
 with p2: ey=st.number_input("Y elementu [m]",0.0,float(L),0.0,.1)
@@ -487,5 +515,5 @@ project={"version":VERSION,"roof_type":roof_type,"ridge_height_m":ridge_h,"width
 "rafter_cm":[rw*100,rh*100],"rafter_spacing_m":spacing,"overhang_m":overhang,
 "braces":braces,"brace_length_m":brace_len,"wood_material":base_wood,"wood_finish":base_finish,"wood_detail":wood_detail,"style_overrides":st.session_state.style_overrides,"custom_elements":st.session_state.custom_elements}
 st.download_button("💾 Zapisz projekt",json.dumps(project,indent=2,ensure_ascii=False),
-                   "wiata-v1.3.json","application/json")
+                   "wiata-v1.4.json","application/json")
 st.warning("Model służy do projektowania geometrii i zestawienia materiału. Nie zastępuje obliczeń konstrukcyjnych.")
