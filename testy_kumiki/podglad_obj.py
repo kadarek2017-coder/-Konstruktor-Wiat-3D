@@ -703,9 +703,15 @@ function parseCarport(text){
  const width=wm?mm(wm[1],wm[2]||'m'):pair?mm(pair[1],pair[3]||'m'):null;
  const length=lm?mm(lm[1],lm[2]||'m'):pair?mm(pair[2],pair[3]||'m'):null;
  const posts=pm?Number(pm[1]):null;
+ const roof=t.includes('jednospad')?'single':t.includes('dwuspad')?'gable':'none';
+ const angleMatch=t.match(/([0-9]+(?:\.[0-9]+)?)\s*(?:stopni|°)/);
+ const angle=angleMatch?Number(angleMatch[1]):roof==='none'?0:20;
+ const heightMatch=t.match(/wysoko[a-ząćęłńóśźż]*\s*(?:ma\s*mieć\s*)?([0-9]+(?:\.[0-9]+)?)\s*(m|mm)?/);
+ const height=heightMatch?mm(heightMatch[1],heightMatch[2]||'m'):null;
  if(!width||!length||width<2000||length<2000||width>20000||length>20000)throw new Error('Podaj wymiary od 2 do 20 m, np. 7x6 m.');
  if(!Number.isInteger(posts)||posts<4||posts>40)throw new Error('Podaj od 4 do 40 słupów.');
- return {width,length,posts};
+ if(angle<0||angle>60)throw new Error('Kąt dachu musi mieć od 0 do 60 stopni.');
+ return {width,length,posts,roof,angle,height};
 }
 function carportPostPositions(w,l,n){
  const a=[];
@@ -720,7 +726,7 @@ function addCarportMember(type,dims,pos,label){
  group.add(part);labels.push(label);const i=group.children.length-1;if(catalog[type].label.startsWith('Belka'))beams.push(part);registerPart(i);return i;
 }
 document.getElementById('parse-carport').addEventListener('click',()=>{
- try{parsedCarport=parseCarport(document.getElementById('carport-prompt').value);document.getElementById('carport-preview').textContent='Odczytano: '+parsedCarport.width/1000+' x '+parsedCarport.length/1000+' m, '+parsedCarport.posts+' słupów.';document.getElementById('generate-carport').disabled=false;}
+ try{parsedCarport=parseCarport(document.getElementById('carport-prompt').value);if(parsedCarport.height)document.getElementById('carport-height').value=String(parsedCarport.height);const roofName=parsedCarport.roof==='gable'?'dach dwuspadowy':parsedCarport.roof==='single'?'dach jednospadowy':'bez automatycznego dachu';document.getElementById('carport-preview').textContent='Odczytano: '+parsedCarport.width/1000+' x '+parsedCarport.length/1000+' m · '+parsedCarport.posts+' słupów · '+roofName+(parsedCarport.roof!=='none'?' '+parsedCarport.angle+'°':'')+'.';document.getElementById('generate-carport').disabled=false;}
  catch(e){parsedCarport=null;document.getElementById('generate-carport').disabled=true;document.getElementById('carport-preview').textContent=e.message;}
 });
 
