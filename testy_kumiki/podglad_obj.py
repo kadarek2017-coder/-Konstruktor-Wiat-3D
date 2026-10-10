@@ -740,9 +740,9 @@ for(const axis of ['x','y','z'])document.getElementById('move-'+axis).addEventLi
  if(selected&&Number.isFinite(value)){selected.position[axis]=selected.userData.home[axis]+value;syncInputs();}
 });
 document.getElementById('reset-part').addEventListener('click',()=>{if(selected){selected.position.copy(selected.userData.home);selected.visible=true;syncInputs();}});
-document.getElementById('hide-part').addEventListener('click',()=>{if(selected){selected.visible=false;choose(-1);}});
+document.getElementById('hide-part').addEventListener('click',()=>{if(selected){selected.visible=false;selectPart(-1);}});
 document.getElementById('reset-all').addEventListener('click',()=>{
- group.children.forEach(part=>{part.position.copy(part.userData.home);part.visible=true;});choose(-1);syncInputs();
+ group.children.forEach(part=>{part.position.copy(part.userData.home);part.visible=true;});selectPart(-1);syncInputs();
 });
 document.getElementById('download-part').addEventListener('click',()=>{
  if(!selected)return;
@@ -815,7 +815,7 @@ function finishPointer(event){
  }else if(pointerStart&&event.pointerId===pointerStart.id){
   const clicked=Math.hypot(event.clientX-pointerStart.x,event.clientY-pointerStart.y)<5;
   pointerStart=null;
-  if(event.type==='pointerup'&&clicked&&!transform.dragging)choose(-1);
+  if(event.type==='pointerup'&&clicked&&!transform.dragging)selectPart(-1);
  }
 }
 canvas.addEventListener('pointerup',finishPointer,true);
