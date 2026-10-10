@@ -17,7 +17,7 @@ python -m streamlit run testy_kumiki/podglad_obj.py
 
 Jeśli środowisko już istnieje, zacznij od polecenia `source`.
 
-W podglądzie wersji 5 przycisk **Wygeneruj poprawiony model** uruchamia
+W podglądzie wersji 6 przycisk **Wygeneruj poprawiony model** uruchamia
 generator tym samym Pythonem co Streamlit i od razu wczytuje nowe pliki.
 Każde wyświetlenie sprawdza geometrię OBJ, w tym orientację przekroju
 czopa. Stary, błędny model jest blokowany, nawet jeśli pozostał po nim
@@ -48,7 +48,11 @@ Ta strona wymaga osobnych zależności z tego folderu; rama pozostaje
 odrębnym modelem i nie zmienia jeszcze pełnej wiaty.
 
 - Kliknij słup lub belkę albo wybierz nazwę w polu **Element**.
-- Przeciągnij kolorową strzałkę X, Y lub Z, aby przesunąć wybrany element.
+- Chwyć sam słup lub belkę lewym przyciskiem i przeciągnij. Element przesuwa się
+  w płaszczyźnie ekranu, bez przeskoku do środka i bez obracania kamery.
+- Przeciągnięcie tła obraca kamerę; rolka przybliża, prawy przycisk przesuwa widok.
+- Opcjonalnie włącz **Strzałki do precyzyjnego przesuwania**, aby przesuwać
+  element w wybranej osi X, Y lub Z.
 - Pola X/Y/Z pokazują przesunięcie względem pozycji złożonej, w mm.
 - **Przywróć element** zeruje jego przesunięcie.
 - **Ukryj element** usuwa go z widoku. Ponowny wybór pokazuje go z powrotem.

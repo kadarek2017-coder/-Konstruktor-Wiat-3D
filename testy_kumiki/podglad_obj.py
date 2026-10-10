@@ -16,7 +16,7 @@ import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Podgląd Kumiki 3D", page_icon="🪚", layout="wide")
 st.title("🪚 Podgląd Kumiki 3D")
-st.caption("Wersja podglądu 5 — pełna rama, wybieranie i przeciąganie elementów")
+st.caption("Wersja podglądu 6 — pełna rama, wybieranie i przeciąganie elementów")
 
 app_dir = Path(__file__).resolve().parent
 base = app_dir / "wyniki"
@@ -106,9 +106,9 @@ html = """
 <div id="wrap" style="position:relative;width:100%;height:760px;border-radius:12px;overflow:hidden;background:#e9e5dd">
  <div id="view" style="width:100%;height:100%"></div>
  <div style="position:absolute;left:14px;top:14px;background:rgba(255,255,255,.93);padding:10px 13px;border-radius:9px;font:14px -apple-system,BlinkMacSystemFont,sans-serif">
-  <b>Kumiki — rama i połączenia · wersja 5</b><br>
-  Kliknij element, następnie przeciągnij kolorową strzałkę.<br>
-  Kliknięcie tła: obrót widoku · rolka: zoom · prawy: przesuwanie widoku
+  <b>Kumiki — rama i połączenia · wersja 6</b><br>
+  Chwyć belkę lub słup lewym przyciskiem i przeciągnij.<br>
+  Przeciąganie tła: obrót widoku · rolka: zoom · prawy: przesuwanie widoku
  </div>
  <div style="position:absolute;left:14px;right:14px;bottom:14px;background:rgba(255,255,255,.93);padding:12px;border-radius:9px;font:14px -apple-system,BlinkMacSystemFont,sans-serif">
   <label for="separation">Uniesienie belki: <output id="distance">0</output> mm</label>
@@ -116,6 +116,7 @@ html = """
   <button id="assemble" type="button">Złóż połączenie</button>
   <button id="separate" type="button">Rozsuń elementy</button>
   <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px">
+   <label><input id="show-arrows" type="checkbox"> Strzałki do precyzyjnego przesuwania</label>
    <label for="selected">Element:</label><select id="selected"><option value="-1">Wybierz element…</option></select>
    <label>X <input id="move-x" type="number" value="0" step="10" style="width:75px"> mm</label>
    <label>Y <input id="move-y" type="number" value="0" step="10" style="width:75px"> mm</label>
@@ -205,6 +206,13 @@ document.getElementById('separate').addEventListener('click',()=>setSeparation(3
 const transform=new TransformControls(camera,renderer.domElement);
 transform.setMode('translate');transform.setSpace('world');transform.setSize(.75);
 scene.add(transform.getHelper());
+const showArrows=document.getElementById('show-arrows');
+transform.enabled=false;
+function updateArrows(){
+ transform.enabled=showArrows.checked;
+ if(selected&&showArrows.checked)transform.attach(selected);else transform.detach();
+}
+showArrows.addEventListener('change',updateArrows);
 transform.addEventListener('dragging-changed',event=>{controls.enabled=!event.value;});
 const select=document.getElementById('selected');
 labels.forEach((label,i)=>{const option=document.createElement('option');option.value=String(i);option.textContent=label;select.appendChild(option);});
@@ -224,8 +232,8 @@ function choose(index){
  group.children.forEach(part=>part.traverse(o=>{if(o.isMesh)o.material.emissive.setHex(0x000000);}));
  selected=index>=0?group.children[index]:null;
  select.value=String(index);
- if(selected){selected.visible=true;selected.traverse(o=>{if(o.isMesh)o.material.emissive.setHex(0x302010);});transform.attach(selected);}
- else transform.detach();
+ if(selected){selected.visible=true;selected.traverse(o=>{if(o.isMesh)o.material.emissive.setHex(0x302010);});}
+ updateArrows();
  syncInputs();
 }
 select.addEventListener('change',()=>choose(Number(select.value)));
@@ -248,24 +256,64 @@ document.getElementById('download-part').addEventListener('click',()=>{
  setTimeout(()=>URL.revokeObjectURL(url),1000);
 });
 const raycaster=new THREE.Raycaster();
+const canvas=renderer.domElement;
 let pointerStart=null;
-renderer.domElement.addEventListener('pointerdown',event=>{if(event.button===0)pointerStart=[event.clientX,event.clientY];});
-renderer.domElement.addEventListener('pointerup',event=>{
- if(!pointerStart||event.button!==0)return;
- const distance=Math.hypot(event.clientX-pointerStart[0],event.clientY-pointerStart[1]);pointerStart=null;
- if(distance>5||transform.dragging||transform.axis!==null)return;
- const rect=renderer.domElement.getBoundingClientRect();
+let drag=null;
+function pointerRay(event){
+ const rect=canvas.getBoundingClientRect();
+ // Uwzględnij ostatnie przesunięcie również przed kolejną klatką renderowania.
+ group.updateMatrixWorld(true);camera.updateMatrixWorld(true);
  raycaster.setFromCamera(new THREE.Vector2((event.clientX-rect.left)/rect.width*2-1,-(event.clientY-rect.top)/rect.height*2+1),camera);
+}
+canvas.addEventListener('pointerdown',event=>{
+ if(event.button!==0||drag)return;
+ // Uchwyt strzałki obsługuje TransformControls w swoim trybie.
+ if(showArrows.checked&&transform.axis!==null)return;
+ pointerStart={id:event.pointerId,x:event.clientX,y:event.clientY};
+ pointerRay(event);
  const hit=raycaster.intersectObjects(group.children.filter(part=>part.visible),true)[0];
- if(!hit){choose(-1);return;}
+ if(!hit)return;
  let part=hit.object;while(part.parent!==group)part=part.parent;
  choose(group.children.indexOf(part));
-});
+ const plane=new THREE.Plane().setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()),hit.point);
+ drag={id:event.pointerId,part,plane,offset:part.getWorldPosition(new THREE.Vector3()).sub(hit.point),moved:false};
+ // Listener w fazie capture blokuje obrót kamery przed obsługą OrbitControls.
+ controls.enabled=false;
+ canvas.setPointerCapture(event.pointerId);
+ canvas.style.cursor='grabbing';
+ event.preventDefault();event.stopImmediatePropagation();
+},true);
+canvas.addEventListener('pointermove',event=>{
+ if(!drag||event.pointerId!==drag.id)return;
+ if(!drag.moved&&Math.hypot(event.clientX-pointerStart.x,event.clientY-pointerStart.y)<3)return;
+ pointerRay(event);
+ const point=raycaster.ray.intersectPlane(drag.plane,new THREE.Vector3());
+ if(point){
+  drag.moved=true;
+  drag.part.position.copy(drag.part.parent.worldToLocal(point.add(drag.offset)));
+  syncInputs();
+ }
+ event.preventDefault();event.stopImmediatePropagation();
+},true);
+function finishPointer(event){
+ if(drag&&event.pointerId===drag.id){
+  drag=null;pointerStart=null;controls.enabled=true;canvas.style.cursor='';
+  if(canvas.hasPointerCapture(event.pointerId))canvas.releasePointerCapture(event.pointerId);
+  event.stopImmediatePropagation();
+ }else if(pointerStart&&event.pointerId===pointerStart.id){
+  const clicked=Math.hypot(event.clientX-pointerStart.x,event.clientY-pointerStart.y)<5;
+  pointerStart=null;
+  if(event.type==='pointerup'&&clicked&&!transform.dragging)choose(-1);
+ }
+}
+canvas.addEventListener('pointerup',finishPointer,true);
+canvas.addEventListener('pointercancel',finishPointer,true);
+canvas.addEventListener('lostpointercapture',finishPointer,true);
 syncInputs();
 
 function resize(){const w=host.clientWidth;camera.aspect=w/760;camera.updateProjectionMatrix();renderer.setSize(w,760,false);}
 new ResizeObserver(resize).observe(host);
-function animate(){controls.update();renderer.render(scene,camera);requestAnimationFrame(animate);}
+function animate(){if(controls.enabled)controls.update();renderer.render(scene,camera);requestAnimationFrame(animate);}
 animate();
 </script>
 """.replace("__OBJS__", obj_json).replace("__LABELS__", json.dumps(labels, ensure_ascii=False))
