@@ -221,6 +221,30 @@ else:
         print("Difference signature:", inspect.signature(k.Difference))
         print("Transform signature:", inspect.signature(k.Transform))
         print("rendered CSG przed:", post_ct._rendered_csg_local)
-        print("UWAGA: jeśli sygnatury powyżej są zgodne, w następnym kroku ustawimy finite end=2250 bez zgadywania API.")
+        rendered = post_ct._rendered_csg_local
+        finite_base = k.RectangularPrism(
+            size=rendered.base.size,
+            transform=rendered.base.transform,
+            start_distance=0.0,
+            end_distance=2250.0,
+        )
+        finite_rendered = k.Difference(base=finite_base, subtract=rendered.subtract)
+        post_ct._extended_rough_csg_local = finite_base
+        post_ct._extended_perfect_csg_local = finite_base
+        post_ct._rendered_csg_local = finite_rendered
+        post_ct._rendered_perfect_csg_local = finite_rendered
+
+        fixed_dir = OUT / "finite_joint"
+        fixed_dir.mkdir(exist_ok=True)
+        fixed_files = k.export_frame_obj(frame, fixed_dir, local=False, combined=False)
+        print("\n=== OBJ PO FINITE FIX ===")
+        for p in fixed_files:
+            bounds = obj_bounds(p)
+            print(" ", p)
+            if bounds:
+                mins, maxs, center, size = bounds
+                print("  MIN    X,Y,Z =", mins)
+                print("  MAX    X,Y,Z =", maxs)
+                print("  ROZMIAR X,Y,Z =", size)
     except Exception as exc:
         print("Diagnostyka finite CSG nieudana:", type(exc).__name__, exc)
