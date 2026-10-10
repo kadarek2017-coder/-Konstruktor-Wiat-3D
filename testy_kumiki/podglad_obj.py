@@ -737,6 +737,16 @@ function parseCarport(text){
  if(angle<0||angle>60)throw new Error('Kąt dachu musi mieć od 0 do 60 stopni.');
  return {width,length,posts,roof,angle,height};
 }
+function carportParameters(p){
+ const number=id=>Number(document.getElementById(id).value);
+ const params={...p,height:p.height||number('carport-height'),postSection:number('carport-post-section'),beamWidth:number('carport-beam-width'),beamHeight:number('carport-beam-height'),overhang:number('carport-overhang'),rafterSpacing:number('carport-rafter-spacing')};
+ if(!Number.isFinite(params.height)||params.height<1800||params.height>6000)throw new Error('Wysokość słupów: 1800–6000 mm.');
+ if(!Number.isFinite(params.postSection)||params.postSection<80||params.postSection>400)throw new Error('Przekrój słupa: 80–400 mm.');
+ if(!Number.isFinite(params.beamWidth)||params.beamWidth<60||params.beamWidth>400||!Number.isFinite(params.beamHeight)||params.beamHeight<80||params.beamHeight>500)throw new Error('Sprawdź przekrój oczepu.');
+ if(!Number.isFinite(params.overhang)||params.overhang<0||params.overhang>2000)throw new Error('Okap: 0–2000 mm.');
+ if(!Number.isFinite(params.rafterSpacing)||params.rafterSpacing<200||params.rafterSpacing>2000)throw new Error('Rozstaw krokwi: 200–2000 mm.');
+ return params;
+}
 function carportPostPositions(w,l,n){
  const a=[];
  if(n===9){for(const y of [-l/2,0,l/2])for(const x of [-w/2,0,w/2])a.push([x,y]);return a;}
@@ -780,25 +790,26 @@ function addRoofMemberBetween(a,b,label){
  part.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
  group.add(part);labels.push(label);const i=group.children.length-1;beams.push(part);registerPart(i);return i;
 }
-function generateCarportRoof(origin,w,l,h,roof,angle){
+function generateCarportRoof(origin,w,l,h,roof,angle,spacing=800,overhang=0){
  if(roof==='none')return 0;
- const rad=angle*Math.PI/180,spacing=800,count=Math.max(2,Math.ceil(l/spacing)+1),ys=Array.from({length:count},(_,i)=>-l/2+i*l/(count-1));
+ const roofW=w+2*overhang,roofL=l+2*overhang;
+ const rad=angle*Math.PI/180,count=Math.max(2,Math.ceil(roofL/spacing)+1),ys=Array.from({length:count},(_,i)=>-roofL/2+i*roofL/(count-1));
  let made=0;
  if(roof==='gable'){
-  const rise=Math.tan(rad)*(w/2);
+  const rise=Math.tan(rad)*(roofW/2);
   const ridgeA=origin.clone().add(new THREE.Vector3(0,-l/2,h+200+rise));
   const ridgeB=origin.clone().add(new THREE.Vector3(0,l/2,h+200+rise));
   addRoofMemberBetween(ridgeA,ridgeB,'Kalenica');made++;
   ys.forEach((y,k)=>{
-   const left=origin.clone().add(new THREE.Vector3(-w/2,y,h+200));
+   const left=origin.clone().add(new THREE.Vector3(-roofW/2,y,h+200));
    const ridge=origin.clone().add(new THREE.Vector3(0,y,h+200+rise));
-   const right=origin.clone().add(new THREE.Vector3(w/2,y,h+200));
+   const right=origin.clone().add(new THREE.Vector3(roofW/2,y,h+200));
    addRoofMemberBetween(left,ridge,'Krokiew lewa '+(k+1));addRoofMemberBetween(ridge,right,'Krokiew prawa '+(k+1));made+=2;
   });
  }else{
-  const rise=Math.tan(rad)*w;
+  const rise=Math.tan(rad)*roofW;
   ys.forEach((y,k)=>{
-   const low=origin.clone().add(new THREE.Vector3(-w/2,y,h+200));
+   const low=origin.clone().add(new THREE.Vector3(-roofW/2,y,h+200));
    const high=origin.clone().add(new THREE.Vector3(w/2,y,h+200+rise));
    addRoofMemberBetween(low,high,'Krokiew jednospadowa '+(k+1));made++;
   });
@@ -827,10 +838,10 @@ function drawLiveCarport(p){
  [[[-w/2,-l/2,h+100],[w/2,-l/2,h+100]], [[-w/2,l/2,h+100],[w/2,l/2,h+100]], [[-w/2,-l/2,h+100],[-w/2,l/2,h+100]], [[w/2,-l/2,h+100],[w/2,l/2,h+100]]].forEach(q=>previewBeamBetween(new THREE.Vector3(...q[0]),new THREE.Vector3(...q[1])));
  const rad=p.angle*Math.PI/180,count=Math.max(2,Math.ceil(l/800)+1);
  for(let i=0;i<count;i++){const y=-l/2+i*l/(count-1);
-  if(p.roof==='gable'){const rise=Math.tan(rad)*w/2,r=new THREE.Vector3(0,y,h+200+rise);previewBeamBetween(new THREE.Vector3(-w/2,y,h+200),r);previewBeamBetween(r,new THREE.Vector3(w/2,y,h+200));}
-  if(p.roof==='single'){const rise=Math.tan(rad)*w;previewBeamBetween(new THREE.Vector3(-w/2,y,h+200),new THREE.Vector3(w/2,y,h+200+rise));}
+  if(p.roof==='gable'){const rise=Math.tan(rad)*roofW/2,r=new THREE.Vector3(0,y,h+200+rise);previewBeamBetween(new THREE.Vector3(-roofW/2,y,h+200),r);previewBeamBetween(r,new THREE.Vector3(roofW/2,y,h+200));}
+  if(p.roof==='single'){const rise=Math.tan(rad)*roofW;previewBeamBetween(new THREE.Vector3(-roofW/2,y,h+200),new THREE.Vector3(w/2,y,h+200+rise));}
  }
- if(p.roof==='gable'){const rise=Math.tan(rad)*w/2;previewBeamBetween(new THREE.Vector3(0,-l/2,h+200+rise),new THREE.Vector3(0,l/2,h+200+rise));}
+ if(p.roof==='gable'){const rise=Math.tan(rad)*roofW/2;previewBeamBetween(new THREE.Vector3(0,-l/2,h+200+rise),new THREE.Vector3(0,l/2,h+200+rise));}
  const box=new THREE.Box3().setFromObject(livePreviewGroup);if(!box.isEmpty()){livePreviewGroup.position.sub(box.getCenter(new THREE.Vector3()));}
  fitAll();
 }
