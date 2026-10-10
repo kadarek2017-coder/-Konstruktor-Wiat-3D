@@ -4,7 +4,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import plotly.graph_objects as go
 
-VERSION = "1.6"
+VERSION = "1.6.1"
 st.set_page_config(page_title=f"Konstruktor Wiat 3D v{VERSION}", page_icon="🏗️", layout="wide", initial_sidebar_state="collapsed")
 st.title(f"Konstruktor Wiat 3D v{VERSION}")
 st.caption("Parametryczny model drewnianej wiaty + ręczna biblioteka elementów 3D")
@@ -170,16 +170,28 @@ if "element_x" not in st.session_state: st.session_state.element_x=float(W/2)
 if "element_y" not in st.session_state: st.session_state.element_y=float(L/2)
 if "element_z" not in st.session_state: st.session_state.element_z=0.0
 
+def sync_pos_from_number(axis):
+    st.session_state[f"element_{axis}_slider"]=st.session_state[f"element_{axis}"]
+
+def sync_pos_from_slider(axis):
+    st.session_state[f"element_{axis}"]=st.session_state[f"element_{axis}_slider"]
+
+for axis in ("x","y","z"):
+    sk=f"element_{axis}_slider"
+    nk=f"element_{axis}"
+    if sk not in st.session_state:
+        st.session_state[sk]=st.session_state[nk]
+
 p1,p2,p3=st.columns(3)
 with p1:
-    ex=st.number_input("↔ X [m]",0.0,float(W),key="element_x",step=.05)
-    st.slider("Pozycja X",0.0,float(W),key="element_x",step=.05,label_visibility="collapsed")
+    ex=st.number_input("↔ X [m]",0.0,float(W),key="element_x",step=.05,on_change=sync_pos_from_number,args=("x",))
+    st.slider("Pozycja X",0.0,float(W),key="element_x_slider",step=.05,label_visibility="collapsed",on_change=sync_pos_from_slider,args=("x",))
 with p2:
-    ey=st.number_input("↕ Y [m]",0.0,float(L),key="element_y",step=.05)
-    st.slider("Pozycja Y",0.0,float(L),key="element_y",step=.05,label_visibility="collapsed")
+    ey=st.number_input("↕ Y [m]",0.0,float(L),key="element_y",step=.05,on_change=sync_pos_from_number,args=("y",))
+    st.slider("Pozycja Y",0.0,float(L),key="element_y_slider",step=.05,label_visibility="collapsed",on_change=sync_pos_from_slider,args=("y",))
 with p3:
-    ez=st.number_input("⬆ Z [m]",0.0,8.0,key="element_z",step=.05)
-    st.slider("Wysokość Z",0.0,8.0,key="element_z",step=.05,label_visibility="collapsed")
+    ez=st.number_input("⬆ Z [m]",0.0,8.0,key="element_z",step=.05,on_change=sync_pos_from_number,args=("z",))
+    st.slider("Wysokość Z",0.0,8.0,key="element_z_slider",step=.05,label_visibility="collapsed",on_change=sync_pos_from_slider,args=("z",))
 
 st.markdown("#### 2. Kierunek i wielkość")
 q1,q2=st.columns([1,2])
@@ -562,5 +574,5 @@ project={"version":VERSION,"roof_type":roof_type,"ridge_height_m":ridge_h,"width
 "rafter_cm":[rw*100,rh*100],"rafter_spacing_m":spacing,"overhang_m":overhang,
 "braces":braces,"brace_length_m":brace_len,"wood_material":base_wood,"wood_finish":base_finish,"wood_detail":wood_detail,"style_overrides":st.session_state.style_overrides,"custom_elements":st.session_state.custom_elements}
 st.download_button("💾 Zapisz projekt",json.dumps(project,indent=2,ensure_ascii=False),
-                   "wiata-v1.6.json","application/json")
+                   "wiata-v1.6.1.json","application/json")
 st.warning("Model służy do projektowania geometrii i zestawienia materiału. Nie zastępuje obliczeń konstrukcyjnych.")
