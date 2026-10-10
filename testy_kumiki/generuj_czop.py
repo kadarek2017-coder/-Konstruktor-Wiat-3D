@@ -41,6 +41,7 @@ def make_post():
         length=2200,
         size=vec(200, 200),
         length_direction=enum_member(k.TimberFace, "TOP", "Top"),
+        width_direction=enum_member(k.TimberFace, "RIGHT", "Right"),
         ticket="SLUP_200x200",
     )
 
