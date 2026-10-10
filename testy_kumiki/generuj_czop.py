@@ -98,6 +98,18 @@ for obj_name in ("CutTimber", "Frame"):
         methods = [n for n in dir(obj) if not n.startswith("_") and any(w in n.lower() for w in ("timber", "cut", "frame", "joint"))]
         print("  metody:", methods)
 
+# Kontrolny eksport słupa bez żadnego połączenia.
+# Znamy już prawidłowy konstruktor: CutTimber(timber, cuts=None, joints=None)
+# oraz Frame(cut_timbers=[...]).
+raw_dir = OUT / "surowy_slup"
+raw_dir.mkdir(exist_ok=True)
+raw_cut = k.CutTimber(post)
+raw_frame = k.Frame(cut_timbers=[raw_cut], name="SUROWY_SLUP")
+raw_files = k.export_frame_obj(raw_frame, raw_dir, local=False, combined=False)
+print("\n=== SUROWY SŁUP 2200 BEZ JOINT ===")
+for p in raw_files:
+    print(" ", p)
+
 print("TEST CENTROWANY: belka X=-800..+800 mm, słup kończy się w Z=2200 mm.")
 print("Węzeł: X=0, Y=0, Z=2200.")
 joint = step(
