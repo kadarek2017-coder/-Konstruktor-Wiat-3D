@@ -308,3 +308,18 @@ Następny etap:
 zaznaczenie dwóch elementów → automatyczne rozpoznanie ich typów, położenia, kąta i przecięcia → lista właściwych połączeń ciesielskich → parametryczny Joint → rzeczywiste cięcie widoczne w 3D.
 
 SelectionManager pozostaje do dalszego rozwinięcia o zaznaczanie prostokątem i operacje grupowe.
+
+
+## 41. Generator konstrukcji z opisu — etap 1
+Wdrożono pierwszy generator tekst → parametry → edytowalny model 3D dla wiaty.
+- rozpoznaje zapis typu „7x6 m, 9 słupów”,
+- rozpoznaje także słowa „szerokość”, „długość” i „słupy”,
+- użytkownik podaje wysokość,
+- 9 słupów jest rozmieszczane jako siatka 3 × 3,
+- inne liczby słupów są rozkładane równomiernie po obwodzie,
+- generator tworzy normalne elementy katalogowe, które można dalej zaznaczać, przesuwać i edytować,
+- dodawane są cztery belki obwodowe,
+- model jest oznaczony jako geometryczny, bez weryfikacji obliczeniowej.
+
+Dalszy rozwój generatora:
+typ dachu → spadek → krokwie/płatwie → edycja parametrów wygenerowanej wiaty → podgląd przed zatwierdzeniem → bardziej naturalne rozumienie polskich opisów.
