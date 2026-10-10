@@ -4,7 +4,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import plotly.graph_objects as go
 
-VERSION = "1.1"
+VERSION = "1.2"
 st.set_page_config(page_title=f"Konstruktor Wiat 3D v{VERSION}", page_icon="🏗️", layout="wide", initial_sidebar_state="collapsed")
 st.title(f"Konstruktor Wiat 3D v{VERSION}")
 st.caption("Parametryczny model drewnianej wiaty + ręczna biblioteka elementów 3D")
@@ -289,7 +289,7 @@ fig.update_layout(
 # Nowy renderer Three.js — pełne, nieprzezroczyste bryły z oświetleniem i cieniami
 three_data={"W":W,"L":L,"Hf":Hf,"Hb":Hb,"bh":bh,"bw":bw,"pc":pc,"rw":rw,"rh":rh,
             "posts":posts,"rafters":positions,"rafter_direction":rafter_direction,
-            "roof_type":roof_type,"ridge_h":ridge_h,"overhang":overhang,"wood":base_wood_color}
+            "roof_type":roof_type,"ridge_h":ridge_h,"overhang":overhang,"wood":base_wood_color,"braces":braces,"brace_len":brace_len}
 three_json=json.dumps(three_data,ensure_ascii=False)
 three_html=f"""
 <div id="three-view" style="width:100%;height:760px;border-radius:12px;overflow:hidden;background:#e8e4dc"></div>
@@ -344,6 +344,18 @@ d.posts.forEach(p=>{{const x=p["X [m]"],y=p["Y [m]"],h=roofH(y,x)-d.bh; addBox(x
 }});
 // belki poprzeczne
 [[0,d.Hf],[d.L,d.Hb]].forEach(v=>addMember([-d.pc/2,v[0],v[1]-d.bh/2],[d.W+d.pc/2,v[0],v[1]-d.bh/2],d.bw,d.bh));
+
+// pełne drewniane zastrzały 3D — jedna ciągła bryła na element
+if(d.braces){{
+ const bl=Math.min(d.brace_len,d.L/3);
+ [0,d.W].forEach(x=>{{
+   addMember([x,0,roofH(0,x)-d.bh-bl],[x,bl,roofH(bl,x)-d.bh],.08,.08);
+   addMember([x,d.L,roofH(d.L,x)-d.bh-bl],[x,d.L-bl,roofH(d.L-bl,x)-d.bh],.08,.08);
+ }});
+ const bx=Math.min(d.brace_len,d.W/3);
+ addMember([0,0,d.Hf-d.bh-bx],[bx,0,d.Hf-d.bh],.08,.08);
+ addMember([d.W,0,d.Hf-d.bh-bx],[d.W-bx,0,d.Hf-d.bh],.08,.08);
+}}
 
 if(d.rafter_direction==='W poprzek (X)'){{
  d.rafters.forEach(y=>{{
@@ -437,5 +449,5 @@ project={"version":VERSION,"roof_type":roof_type,"ridge_height_m":ridge_h,"width
 "rafter_cm":[rw*100,rh*100],"rafter_spacing_m":spacing,"overhang_m":overhang,
 "braces":braces,"brace_length_m":brace_len,"wood_material":base_wood,"wood_finish":base_finish,"wood_detail":wood_detail,"style_overrides":st.session_state.style_overrides,"custom_elements":st.session_state.custom_elements}
 st.download_button("💾 Zapisz projekt",json.dumps(project,indent=2,ensure_ascii=False),
-                   "wiata-v1.1.json","application/json")
+                   "wiata-v1.2.json","application/json")
 st.warning("Model służy do projektowania geometrii i zestawienia materiału. Nie zastępuje obliczeń konstrukcyjnych.")
