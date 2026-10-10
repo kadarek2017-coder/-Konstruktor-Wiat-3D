@@ -16,7 +16,7 @@ import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Podgląd Kumiki 3D", page_icon="🪚", layout="wide")
 st.title("🪚 Podgląd Kumiki 3D")
-st.caption("Wersja podglądu 12 — dokładne pozycjonowanie i baza połączeń")
+st.caption("Wersja podglądu 13 — wielokrotne zaznaczanie, dokładne pozycjonowanie i baza połączeń")
 
 app_dir = Path(__file__).resolve().parent
 base = app_dir / "wyniki"
@@ -152,9 +152,10 @@ html = """
  </style>
  <div id="view" style="width:100%;height:100%"></div>
  <div style="position:absolute;left:14px;top:14px;background:rgba(255,255,255,.93);padding:10px 13px;border-radius:9px;font:14px -apple-system,BlinkMacSystemFont,sans-serif">
-  <b>Kumiki — rama i połączenia · wersja 12</b><br>
-  Kliknij pierwszy element, Shift + kliknij drugi — wybór pary.<br>
-  Chwyć element bez Shift, aby go przeciągnąć.<br>
+  <b>Kumiki — rama i połączenia · wersja 13</b><br>
+  Klik = jeden element · Shift/Ctrl/Cmd + klik = dodaj/usuń z zaznaczenia.<br>
+  Dwa zaznaczone elementy automatycznie stają się parą A/B do połączenia.<br>
+  Chwyć element bez klawisza modyfikującego, aby go przeciągnąć.<br>
   Przeciąganie tła: obrót widoku · rolka: zoom · prawy: przesuwanie widoku
  </div>
  <div id="measurement" style="position:absolute;left:14px;top:100px;background:rgba(255,255,255,.94);padding:7px;border-radius:6px;font:13px sans-serif" hidden></div>
@@ -319,6 +320,7 @@ transform.addEventListener('dragging-changed',event=>{controls.enabled=!event.va
 const select=document.getElementById('selected');
 labels.forEach((label,i)=>{const option=document.createElement('option');option.value=String(i);option.textContent=label;select.appendChild(option);});
 let selected=null;
+const selectedIndices=new Set();
 let reference=null;
 const dimensionLine=new THREE.Line(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:0x176bb0,depthTest:false}));
 dimensionLine.renderOrder=10;dimensionLine.visible=false;scene.add(dimensionLine);
@@ -521,18 +523,32 @@ document.getElementById('clear-joint-pair').addEventListener('click',()=>{jointA
 document.getElementById('pair-mode').addEventListener('change',event=>{
  if(event.target.checked){jointA=-1;jointB=-1;syncPair();}
 });
+function syncJointPairFromSelection(){
+ const pair=[...selectedIndices].filter(i=>i>=0&&i<group.children.length).slice(0,2);
+ jointA=pair.length>0?pair[0]:-1;
+ jointB=pair.length>1?pair[1]:-1;
+}
 function selectPart(index,additive=false){
- if(additive){
-  if(jointA<0&&selected&&selected!==group.children[index])jointA=group.children.indexOf(selected);
-  if(index===jointA)jointA=-1;
-  else if(index===jointB)jointB=-1;
-  else if(jointA<0)jointA=index;
-  else jointB=index;
- }else if(document.getElementById('pair-mode').checked){
-  if(jointA<0||jointB>=0){jointA=index;jointB=-1;}
-  else if(index!==jointA)jointB=index;
+ if(index<0){
+  selectedIndices.clear();
+  jointA=-1;jointB=-1;
+  choose(-1);syncPair();return;
  }
- choose(index);syncPair();
+ if(additive){
+  if(selectedIndices.has(index))selectedIndices.delete(index);
+  else selectedIndices.add(index);
+ }else{
+  selectedIndices.clear();
+  selectedIndices.add(index);
+ }
+ const active=selectedIndices.has(index)?index:([ ...selectedIndices ].at(-1)??-1);
+ choose(active);
+ syncJointPairFromSelection();
+ syncPair();
+ const count=selectedIndices.size;
+ document.getElementById('part-status').textContent=count
+  ?('Zaznaczono '+count+(count===1?' element.':' elementy.'))
+  :'Brak zaznaczenia.';
 }
 for(const [id,role] of [['set-joint-a','a'],['set-joint-b','b']])document.getElementById(id).addEventListener('click',()=>{
  if(!selected){document.getElementById('part-status').textContent='Najpierw zaznacz element w modelu.';return;}
@@ -637,7 +653,7 @@ function loadProject(data){
   if(!def||!Number.isInteger(def.type)||!catalog[def.type]||!Array.isArray(def.dimensions)||def.dimensions.length!==3||def.dimensions.some(n=>typeof n!=='number'))throw new Error('Projekt zawiera nieznany typ elementu.');
   return catalogPart(def.type,def.dimensions);
  });
- choose(-1);jointA=-1;jointB=-1;syncPair();reference=null;document.getElementById('reference-name').textContent='Odniesienie: brak';
+ selectedIndices.clear();choose(-1);jointA=-1;jointB=-1;syncPair();reference=null;document.getElementById('reference-name').textContent='Odniesienie: brak';
  while(group.children.length>basePartCount){
   const part=group.children[group.children.length-1];group.remove(part);
   part.traverse(o=>{if(o.isMesh){o.geometry.dispose();o.material.dispose();}});
@@ -703,12 +719,12 @@ function syncInputs(){
 }
 function refreshSelection(){
  group.children.forEach((part,i)=>part.traverse(o=>{
-  if(o.isMesh)o.material.emissive.setHex(i===jointA?0x123b70:i===jointB?0x12552b:part===selected?0x302010:0x000000);
+  if(o.isMesh)o.material.emissive.setHex(i===jointA?0x123b70:i===jointB?0x12552b:selectedIndices.has(i)?0x302010:0x000000);
  }));
  partCards.forEach((card,i)=>{
-  card.setAttribute('aria-pressed',String(group.children[i]===selected||i===jointA||i===jointB));
-  card.style.borderColor=i===jointA?'#176bb0':i===jointB?'#218944':'';
-  card.title=(i===jointA?'Element A · ':i===jointB?'Element B · ':'')+labels[i];
+  card.setAttribute('aria-pressed',String(selectedIndices.has(i)));
+  card.style.borderColor=i===jointA?'#176bb0':i===jointB?'#218944':selectedIndices.has(i)?'#b7793f':'';
+  card.title=(i===jointA?'Element A · ':i===jointB?'Element B · ':selectedIndices.has(i)?'Zaznaczony · ':'')+labels[i];
  });
 }
 function choose(index){
@@ -758,15 +774,16 @@ function pointerRay(event){
 canvas.addEventListener('pointerdown',event=>{
  if(event.button!==0||drag)return;
  // Uchwyt strzałki obsługuje TransformControls w swoim trybie.
- if(!event.shiftKey&&!document.getElementById('pair-mode').checked&&showArrows.checked&&transform.axis!==null)return;
+ const additive=event.shiftKey||event.ctrlKey||event.metaKey;
+ if(!additive&&!document.getElementById('pair-mode').checked&&showArrows.checked&&transform.axis!==null)return;
  pointerStart={id:event.pointerId,x:event.clientX,y:event.clientY};
  pointerRay(event);
  const hit=raycaster.intersectObjects(group.children.filter(part=>part.visible),true)[0];
  if(!hit)return;
  let part=hit.object;while(part.parent!==group)part=part.parent;
  const index=group.children.indexOf(part);
- if(event.shiftKey||document.getElementById('pair-mode').checked){
-  pointerStart=null;selectPart(index,event.shiftKey);
+ if(additive||document.getElementById('pair-mode').checked){
+  pointerStart=null;selectPart(index,true);
   event.preventDefault();event.stopImmediatePropagation();return;
  }
  selectPart(index);
