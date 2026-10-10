@@ -17,7 +17,7 @@ python -m streamlit run testy_kumiki/podglad_obj.py
 
 Jeśli środowisko już istnieje, zacznij od polecenia `source`.
 
-W podglądzie wersji 6 przycisk **Wygeneruj poprawiony model** uruchamia
+W podglądzie wersji 7 przycisk **Wygeneruj poprawiony model** uruchamia
 generator tym samym Pythonem co Streamlit i od razu wczytuje nowe pliki.
 Każde wyświetlenie sprawdza geometrię OBJ, w tym orientację przekroju
 czopa. Stary, błędny model jest blokowany, nawet jeśli pozostał po nim
@@ -66,6 +66,27 @@ połączeń. Odświeżenie widoku przywraca złożoną ramę.
 ```bash
 python testy_kumiki/generuj_czop.py --frame
 python testy_kumiki/generuj_czop.py --frame --flat
+```
+
+## Szkielet przestrzenny
+
+Włącz **Szkielet przestrzenny — dwie ramy i belki łączące**.
+Model zawiera cztery słupy, dwie belki ram długości 3000 mm i dwie
+belki łączące w osi Y. Ramy mają rozstaw 3000 mm, a słupy każdej ramy
+rozstaw 2400 mm. Każdy element można chwycić i przeciągnąć osobno,
+ukryć, przywrócić lub pobrać jako OBJ.
+
+Obie ramy mają rzeczywiste czopy i gniazda. Belki łączące leżą na
+belkach ram, z równym końcem na zewnętrznych krawędziach podpór:
+mają długość 3100 mm na sztorc albo 3200 mm płasko. Nie mają jeszcze
+wycięć ani łączników. Miecze i krokwie będą dodane w kolejnych etapach.
+Suwak uniesienia podnosi wszystkie belki razem; przeciąganie pozostaje
+niezależne dla każdego elementu. To model poglądowy, nie ukończony
+projekt wykonawczy.
+
+```bash
+python testy_kumiki/generuj_czop.py --skeleton
+python testy_kumiki/generuj_czop.py --skeleton --flat
 ```
 
 ## Jednostki i położenie

@@ -6,7 +6,7 @@ import unittest
 import numpy as np
 import trimesh
 
-from testy_kumiki.generuj_czop import BEAM_NAME, POST_NAME, generate, validate_meshes
+from testy_kumiki.generuj_czop import BEAM_NAME, POST_NAME, generate, validate_meshes, validate_skeleton
 
 
 class GeometryTests(unittest.TestCase):
@@ -72,6 +72,30 @@ class FullFrameTests(unittest.TestCase):
                 for name in ("SLUP_LEWY_200x200", "SLUP_PRAWY_200x200"):
                     overlap = trimesh.boolean.intersection([meshes[name], meshes[BEAM_NAME]], engine="manifold")
                     self.assertTrue(overlap.is_empty or abs(overlap.volume) < 0.1)
+
+
+class SkeletonTests(unittest.TestCase):
+    def test_exported_skeleton_support_and_no_collisions(self):
+        from itertools import combinations
+        for flat in (False, True):
+            with self.subTest(flat=flat), TemporaryDirectory() as temporary:
+                output = Path(temporary)
+                report = generate(output, beam_flat=flat, skeleton=True)
+                meshes = {name: trimesh.load_mesh(output / f"{name}.obj")
+                          for name in report["parts"]}
+                self.assertEqual(len(meshes), 8)
+                validate_skeleton(meshes, beam_flat=flat)
+                self.assertTrue(report["skeleton"])
+                for (name_a, a), (name_b, b) in combinations(meshes.items(), 2):
+                    # Broad phase: only pairs whose bounding boxes meet.
+                    if np.any(a.bounds[1] < b.bounds[0]-.001) or np.any(b.bounds[1] < a.bounds[0]-.001):
+                        continue
+                    overlap = trimesh.boolean.intersection([a, b], engine="manifold")
+                    self.assertTrue(overlap.is_empty or abs(overlap.volume) < 5,
+                                    f"{name_a} collides with {name_b}: {overlap.volume}")
+                connector = meshes["LACZNIK_LEWY"]
+                front = meshes["PRZOD_" + BEAM_NAME]
+                self.assertAlmostEqual(connector.bounds[0, 2], front.bounds[1, 2], delta=.001)
 
 
 if __name__ == "__main__":

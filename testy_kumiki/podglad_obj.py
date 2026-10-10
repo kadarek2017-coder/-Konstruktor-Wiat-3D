@@ -16,7 +16,7 @@ import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Podgląd Kumiki 3D", page_icon="🪚", layout="wide")
 st.title("🪚 Podgląd Kumiki 3D")
-st.caption("Wersja podglądu 6 — pełna rama, wybieranie i przeciąganie elementów")
+st.caption("Wersja podglądu 7 — szkielet przestrzenny, wybieranie i przeciąganie elementów")
 
 app_dir = Path(__file__).resolve().parent
 base = app_dir / "wyniki"
@@ -39,17 +39,24 @@ full_frame = st.checkbox(
     "Pełna rama — dwa słupy i belka 3000 mm", value=bool(saved_report.get("full_frame", True)),
     key="full_frame", on_change=request_generation,
 )
+skeleton = st.checkbox(
+    "Szkielet przestrzenny — dwie ramy i belki łączące", value=bool(saved_report.get("skeleton", False)),
+    key="skeleton", on_change=request_generation,
+)
+if skeleton:
+    full_frame = True
+    st.caption("Rozstaw ram: 3000 mm · cztery słupy · cztery belki. Belki łączące leżą na belkach ram; ich połączenia będą dodane w kolejnym etapie.")
 if full_frame:
     st.caption("Rozstaw osi słupów: 2400 mm · dwa czopy i dwa gniazda w jednej belce.")
 width, height = (200, 100) if beam_flat else (100, 200)
 st.caption(f"Słup 200×200 mm · belka: szerokość {width} mm, wysokość {height} mm. Zmiana ustawienia przelicza czop i gniazdo.")
 clicked_generate = st.button("Wygeneruj poprawiony model", type="primary")
 regenerate_requested = st.session_state.pop("regenerate_model", False)
-if clicked_generate or regenerate_requested or full_frame != saved_report.get("full_frame", False):
+if clicked_generate or regenerate_requested or full_frame != saved_report.get("full_frame", False) or skeleton != saved_report.get("skeleton", False):
     with st.spinner("Generowanie i sprawdzanie czopa oraz gniazda…"):
         try:
             result = subprocess.run(
-                [sys.executable, str(app_dir / "generuj_czop.py")] + (["--flat"] if beam_flat else []) + (["--frame"] if full_frame else []),
+                [sys.executable, str(app_dir / "generuj_czop.py")] + (["--flat"] if beam_flat else []) + (["--frame"] if full_frame else []) + (["--skeleton"] if skeleton else []),
                 capture_output=True, text=True, timeout=60, check=False,
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
@@ -62,6 +69,12 @@ if clicked_generate or regenerate_requested or full_frame != saved_report.get("f
     st.success("Wygenerowano poprawiony model.")
 names = (["SLUP_LEWY_200x200", "SLUP_PRAWY_200x200"] if full_frame else ["SLUP_200x200"]) + ["BELKA_100x200"]
 labels = (["Słup lewy", "Słup prawy"] if full_frame else ["Słup"]) + ["Belka"]
+if skeleton:
+    sys.path.insert(0, str(app_dir))
+    from generuj_czop import skeleton_parts
+    sys.path.pop(0)
+    names = list(skeleton_parts(beam_flat))
+    labels = list(skeleton_parts(beam_flat).values())
 paths = [base / f"{name}.obj" for name in names]
 missing = [p.name for p in paths if not p.exists()]
 if missing:
@@ -85,7 +98,10 @@ try:
         sys.path.pop(0)
     meshes = {path.stem: trimesh.load_mesh(io.StringIO(obj), file_type="obj")
               for path, obj in zip(paths, objs)}
-    generuj_czop.validate_meshes(meshes, beam_flat=beam_flat, full_frame=full_frame)
+    if skeleton:
+        generuj_czop.validate_skeleton(meshes, beam_flat=beam_flat)
+    else:
+        generuj_czop.validate_meshes(meshes, beam_flat=beam_flat, full_frame=full_frame)
 except ImportError:
     st.error("Brakuje zależności do sprawdzenia i generowania modelu.")
     st.code("python -m pip install -r testy_kumiki/requirements.txt")
@@ -106,12 +122,12 @@ html = """
 <div id="wrap" style="position:relative;width:100%;height:760px;border-radius:12px;overflow:hidden;background:#e9e5dd">
  <div id="view" style="width:100%;height:100%"></div>
  <div style="position:absolute;left:14px;top:14px;background:rgba(255,255,255,.93);padding:10px 13px;border-radius:9px;font:14px -apple-system,BlinkMacSystemFont,sans-serif">
-  <b>Kumiki — rama i połączenia · wersja 6</b><br>
+  <b>Kumiki — rama i połączenia · wersja 7</b><br>
   Chwyć belkę lub słup lewym przyciskiem i przeciągnij.<br>
   Przeciąganie tła: obrót widoku · rolka: zoom · prawy: przesuwanie widoku
  </div>
  <div style="position:absolute;left:14px;right:14px;bottom:14px;background:rgba(255,255,255,.93);padding:12px;border-radius:9px;font:14px -apple-system,BlinkMacSystemFont,sans-serif">
-  <label for="separation">Uniesienie belki: <output id="distance">0</output> mm</label>
+  <label for="separation">Uniesienie belek: <output id="distance">0</output> mm</label>
   <input id="separation" type="range" min="0" max="500" step="5" value="0" style="width:100%;display:block;margin:8px 0">
   <button id="assemble" type="button">Złóż połączenie</button>
   <button id="separate" type="button">Rozsuń elementy</button>
@@ -168,7 +184,7 @@ objTexts.forEach((txt,i)=>{
  obj.traverse(o=>{
    if(o.isMesh){
     o.geometry.translate(-partCenter.x,-partCenter.y,-partCenter.z);
-    o.material=mats[i===objTexts.length-1?1:0].clone();o.castShadow=true;o.receiveShadow=true;
+    o.material=mats[labels[i].startsWith('Belka')?1:0].clone();o.castShadow=true;o.receiveShadow=true;
    }
  });
  obj.position.copy(partCenter);obj.userData.home=partCenter.clone();
@@ -193,9 +209,10 @@ const grid=new THREE.GridHelper(maxDim*2,20,0x8d887f,0xc5bfb5);
 grid.rotation.x=Math.PI/2; grid.position.z=-size.z/2; scene.add(grid);
 const separation=document.getElementById('separation');
 const beam=group.children[group.children.length-1];
+const beams=group.children.filter((part,i)=>labels[i].startsWith('Belka'));
 function setSeparation(value){
  separation.value=String(value);
- beam.position.z=beam.userData.home.z+value;
+ beams.forEach(part=>{part.position.z=part.userData.home.z+value;});
  document.getElementById('distance').textContent=String(value);
  syncInputs();
 }
