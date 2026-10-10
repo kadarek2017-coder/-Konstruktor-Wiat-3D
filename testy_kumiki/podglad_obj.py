@@ -731,6 +731,43 @@ document.getElementById('parse-carport').addEventListener('click',()=>{
 });
 
 
+
+function addRoofMemberBetween(a,b,label){
+ const delta=b.clone().sub(a),len=delta.length(),mid=a.clone().add(b).multiplyScalar(.5);
+ const part=catalogPart(1,[len,80,180]);
+ part.position.copy(mid);part.rotation.order='ZYX';
+ part.rotation.z=Math.atan2(delta.y,delta.x);
+ part.rotation.y=-Math.atan2(delta.z,Math.hypot(delta.x,delta.y));
+ part.userData.home=part.position.clone();part.userData.added=true;
+ part.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
+ group.add(part);labels.push(label);const i=group.children.length-1;beams.push(part);registerPart(i);return i;
+}
+function generateCarportRoof(origin,w,l,h,roof,angle){
+ if(roof==='none')return 0;
+ const rad=angle*Math.PI/180,spacing=800,count=Math.max(2,Math.ceil(l/spacing)+1),ys=Array.from({length:count},(_,i)=>-l/2+i*l/(count-1));
+ let made=0;
+ if(roof==='gable'){
+  const rise=Math.tan(rad)*(w/2);
+  const ridgeA=origin.clone().add(new THREE.Vector3(0,-l/2,h+200+rise));
+  const ridgeB=origin.clone().add(new THREE.Vector3(0,l/2,h+200+rise));
+  addRoofMemberBetween(ridgeA,ridgeB,'Kalenica');made++;
+  ys.forEach((y,k)=>{
+   const left=origin.clone().add(new THREE.Vector3(-w/2,y,h+200));
+   const ridge=origin.clone().add(new THREE.Vector3(0,y,h+200+rise));
+   const right=origin.clone().add(new THREE.Vector3(w/2,y,h+200));
+   addRoofMemberBetween(left,ridge,'Krokiew lewa '+(k+1));addRoofMemberBetween(ridge,right,'Krokiew prawa '+(k+1));made+=2;
+  });
+ }else{
+  const rise=Math.tan(rad)*w;
+  ys.forEach((y,k)=>{
+   const low=origin.clone().add(new THREE.Vector3(-w/2,y,h+200));
+   const high=origin.clone().add(new THREE.Vector3(w/2,y,h+200+rise));
+   addRoofMemberBetween(low,high,'Krokiew jednospadowa '+(k+1));made++;
+  });
+ }
+ return made;
+}
+
 document.getElementById('generate-carport').addEventListener('click',()=>{
  try{
   if(!parsedCarport)throw new Error('Najpierw odczytaj opis.');
@@ -745,8 +782,9 @@ document.getElementById('generate-carport').addEventListener('click',()=>{
   const a=addCarportMember(1,[l+200,140,200],origin.clone().add(new THREE.Vector3(-w/2,0,h+100)),'Belka wiaty lewa');
   const b=addCarportMember(1,[l+200,140,200],origin.clone().add(new THREE.Vector3(w/2,0,h+100)),'Belka wiaty prawa');
   group.children[a].rotation.z=Math.PI/2;group.children[b].rotation.z=Math.PI/2;
+  const roofParts=generateCarportRoof(origin,w,l,h,parsedCarport.roof,parsedCarport.angle);
   selectPart(start);fitAll();
-  document.getElementById('part-status').textContent='Wygenerowano wiatę '+w/1000+' x '+l/1000+' m: '+n+' słupów i 4 belki. Wszystkie elementy można edytować.';
+  document.getElementById('part-status').textContent='Wygenerowano wiatę '+w/1000+' x '+l/1000+' m: '+n+' słupów, 4 belki'+(roofParts?' i '+roofParts+' elementów dachu':'')+'. Wszystkie elementy można edytować.';
  }catch(e){document.getElementById('part-status').textContent=e.message;}
 });
 
