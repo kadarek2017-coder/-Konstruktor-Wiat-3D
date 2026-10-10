@@ -16,7 +16,7 @@ import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Podgląd Kumiki 3D", page_icon="🪚", layout="wide")
 st.title("🪚 Podgląd Kumiki 3D")
-st.caption("Wersja podglądu 15 — generator wiaty z dachem")
+st.caption("Wersja podglądu 16 — automatyczny podgląd 3D z opisu")
 
 app_dir = Path(__file__).resolve().parent
 base = app_dir / "wyniki"
@@ -152,7 +152,7 @@ html = """
  </style>
  <div id="view" style="width:100%;height:100%"></div>
  <div style="position:absolute;left:14px;top:14px;background:rgba(255,255,255,.93);padding:10px 13px;border-radius:9px;font:14px -apple-system,BlinkMacSystemFont,sans-serif">
-  <b>Kumiki — rama i połączenia · wersja 15</b><br>
+  <b>Kumiki — rama i połączenia · wersja 16</b><br>
   Klik = jeden element · Shift/Ctrl/Cmd + klik = dodaj/usuń z zaznaczenia.<br>
   Dwa zaznaczone elementy automatycznie stają się parą A/B do połączenia.<br>
   Chwyć element bez klawisza modyfikującego, aby go przeciągnąć.<br>
@@ -160,7 +160,7 @@ html = """
  </div>
  <div id="measurement" style="position:absolute;left:14px;top:100px;background:rgba(255,255,255,.94);padding:7px;border-radius:6px;font:13px sans-serif" hidden></div>
  <aside id="parts-panel" aria-label="Graficzny wybór elementów">
-  <details open><summary>Generator wiaty z opisu</summary>\n   <p style="margin:4px 0">Np. „Wiata 7x6 m, 9 słupów, dach dwuspadowy 25 stopni, wysokość 3 m”.</p>\n   <textarea id="carport-prompt" rows="4" style="width:100%;box-sizing:border-box" placeholder="Wiata 7x6 m, 9 słupów, dach dwuspadowy 25 stopni, wysokość 3 m"></textarea>\n   <button id="parse-carport" type="button">Odczytaj opis</button>\n   <p id="carport-preview">Podaj wymiary i liczbę słupów.</p>\n   <label>Wysokość <input id="carport-height" type="number" value="2800" min="1800" max="6000" step="100" style="width:70px"> mm</label><br>\n   <button id="generate-carport" type="button" disabled>Wygeneruj wiatę 3D</button>\n   <small>Model geometryczny — konstrukcja nie została zweryfikowana obliczeniowo.</small>\n  </details>\n  <details open><summary>Katalog — dodaj element</summary>
+  <details open><summary>Generator wiaty z opisu</summary>\n   <p style="margin:4px 0">Np. „Wiata 7x6 m, 9 słupów, dach dwuspadowy 25 stopni, wysokość 3 m”.</p>\n   <textarea id="carport-prompt" rows="4" style="width:100%;box-sizing:border-box" placeholder="Wiata 7x6 m, 9 słupów, dach dwuspadowy 25 stopni, wysokość 3 m"></textarea>\n   <p id="carport-preview">Pisz opis — podgląd 3D pojawi się automatycznie.</p>\n   <label>Wysokość <input id="carport-height" type="number" value="2800" min="1800" max="6000" step="100" style="width:70px"> mm</label><br>\n   <label><input id="live-carport" type="checkbox" checked> Podgląd 3D na żywo</label><br>\n   <button id="generate-carport" type="button" disabled>Zatwierdź / wygeneruj ponownie</button>\n   <small>Model geometryczny — konstrukcja nie została zweryfikowana obliczeniowo.</small>\n  </details>\n  <details open><summary>Katalog — dodaj element</summary>
    <p style="margin:4px 0">Przeciągnij kafelek do widoku 3D albo kliknij, aby dodać.</p>
    <div id="catalog-size">
     <label>Długość <input id="part-length" type="number" min="50" max="20000" step="50" value="3000"> mm</label>
