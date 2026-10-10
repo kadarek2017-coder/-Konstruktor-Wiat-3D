@@ -205,3 +205,22 @@ for p in files:
     print(f"  ROZMIAR X,Y,Z = {fmt(size)}")
 
 print("\nSkopiuj sekcję 'RZECZYWISTE GRANICE OBJ' — na jej podstawie ustawimy elementy dokładnie.")
+
+
+# Test: skończona baza CSG słupa po Joint.
+# Cel: potwierdzić, czy end=None jest przyczyną obcięcia OBJ do 1000 mm.
+print("\n=== TEST FINITE CSG SŁUPA PO JOINT ===")
+post_ct = next((ct for ct in frame.cut_timbers
+                if getattr(getattr(getattr(ct, "timber", None), "ticket", None), "path", "") == "SLUP_200x200"), None)
+if post_ct is None:
+    print("Nie znaleziono CutTimber słupa.")
+else:
+    try:
+        import inspect
+        print("RectangularPrism signature:", inspect.signature(k.RectangularPrism))
+        print("Difference signature:", inspect.signature(k.Difference))
+        print("Transform signature:", inspect.signature(k.Transform))
+        print("rendered CSG przed:", post_ct._rendered_csg_local)
+        print("UWAGA: jeśli sygnatury powyżej są zgodne, w następnym kroku ustawimy finite end=2250 bez zgadywania API.")
+    except Exception as exc:
+        print("Diagnostyka finite CSG nieudana:", type(exc).__name__, exc)
