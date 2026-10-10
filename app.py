@@ -1,9 +1,10 @@
 import json, math
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 import plotly.graph_objects as go
 
-VERSION = "0.10"
+VERSION = "1.0"
 st.set_page_config(page_title=f"Konstruktor Wiat 3D v{VERSION}", page_icon="🏗️", layout="wide", initial_sidebar_state="collapsed")
 st.title(f"Konstruktor Wiat 3D v{VERSION}")
 st.caption("Parametryczny model drewnianej wiaty + ręczna biblioteka elementów 3D")
@@ -285,10 +286,70 @@ fig.update_layout(
     showlegend=False
 )
 
+# Nowy renderer Three.js — pełne, nieprzezroczyste bryły z oświetleniem i cieniami
+three_data={"W":W,"L":L,"Hf":Hf,"Hb":Hb,"bh":bh,"bw":bw,"pc":pc,"rw":rw,"rh":rh,
+            "posts":posts,"rafters":positions,"rafter_direction":rafter_direction,
+            "roof_type":roof_type,"ridge_h":ridge_h,"overhang":overhang,"wood":base_wood_color}
+three_json=json.dumps(three_data,ensure_ascii=False)
+three_html=f"""
+<div id="three-view" style="width:100%;height:760px;border-radius:12px;overflow:hidden;background:#e8e4dc"></div>
+<script type="importmap">{{"imports":{{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"}}}}</script>
+<script type="module">
+import * as THREE from 'three';
+import {{ OrbitControls }} from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/controls/OrbitControls.js';
+const d={three_json};
+const host=document.getElementById('three-view');
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0xe8e4dc);
+const camera=new THREE.PerspectiveCamera(42,host.clientWidth/760,.05,100);
+camera.position.set(d.W*1.15,-d.L*1.35,Math.max(d.Hf,d.Hb)+4);
+const renderer=new THREE.WebGLRenderer({{antialias:true,alpha:false}});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2)); renderer.setSize(host.clientWidth,760);
+renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputColorSpace=THREE.SRGBColorSpace; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.05;
+host.appendChild(renderer.domElement);
+const controls=new OrbitControls(camera,renderer.domElement); controls.enableDamping=true;
+controls.target.set(d.W/2,d.L/2,Math.min(d.Hf,d.Hb)/2);
+scene.add(new THREE.HemisphereLight(0xfff7e8,0x8b8174,2.2));
+const sun=new THREE.DirectionalLight(0xfff2d6,3.2); sun.position.set(-5,-7,10); sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048); scene.add(sun);
+const wood=new THREE.MeshStandardMaterial({{color:d.wood,roughness:.78,metalness:0}});
+const groundMat=new THREE.MeshStandardMaterial({{color:0xb9b5aa,roughness:1}});
+function addBox(cx,cy,cz,sx,sy,sz,mat=wood){{
+ const g=new THREE.BoxGeometry(Math.max(sx,.01),Math.max(sy,.01),Math.max(sz,.01));
+ const m=new THREE.Mesh(g,mat); m.position.set(cx,cy,cz); m.castShadow=true; m.receiveShadow=true; scene.add(m); return m;
+}}
+function roofH(y,x){{
+ if(d.roof_type==='Jednospadowy') return d.Hf+(d.Hb-d.Hf)*(y/d.L);
+ if(d.roof_type==='Płaski') return d.Hf;
+ const half=d.W/2; return d.Hf+(d.ridge_h-d.Hf)*(1-Math.abs(x-half)/half);
+}}
+addBox(d.W/2,d.L/2,-.06,d.W+1,d.L+1,.12,groundMat);
+d.posts.forEach(p=>{{const x=p["X [m]"],y=p["Y [m]"],h=roofH(y,x)-d.bh; addBox(x,y,h/2,d.pc,d.pc,h);}});
+const seg=32;
+[0,d.W].forEach(x=>{{for(let s=0;s<seg;s++){{const y0=d.L*s/seg,y1=d.L*(s+1)/seg,ym=(y0+y1)/2,z=roofH(ym,x)-d.bh/2; addBox(x,ym,z,d.bw,y1-y0,d.bh);}}}});
+[[0,d.Hf],[d.L,d.Hb]].forEach(v=>addBox(d.W/2,v[0],v[1]-d.bh/2,d.W+d.pc,d.bw,d.bh));
+if(d.rafter_direction==='W poprzek (X)'){{
+ d.rafters.forEach(y=>{{if(d.roof_type==='Dwuspadowy'){{for(let s=0;s<seg;s++){{const x0=-d.overhang+(d.W+2*d.overhang)*s/seg,x1=-d.overhang+(d.W+2*d.overhang)*(s+1)/seg,xm=(x0+x1)/2,h=roofH(y,Math.max(0,Math.min(d.W,xm))); addBox(xm,y,h+d.rh/2,x1-x0,d.rw,d.rh);}}}}else{{const h=roofH(y,d.W/2);addBox(d.W/2,y,h+d.rh/2,d.W+2*d.overhang,d.rw,d.rh);}}}});
+}} else {{
+ d.rafters.forEach(x=>{{for(let s=0;s<seg;s++){{const y0=-d.overhang+(d.L+2*d.overhang)*s/seg,y1=-d.overhang+(d.L+2*d.overhang)*(s+1)/seg,ym=(y0+y1)/2,h=roofH(Math.max(0,Math.min(d.L,ym)),x);addBox(x,ym,h+d.rh/2,d.rw,y1-y0,d.rh);}}}});
+}}
+const grid=new THREE.GridHelper(Math.max(d.W,d.L)+2,Math.ceil(Math.max(d.W,d.L)+2),0x8f8a80,0xc7c1b6); grid.rotation.x=Math.PI/2; grid.position.z=.005; scene.add(grid);
+function resize(){{const w=host.clientWidth;camera.aspect=w/760;camera.updateProjectionMatrix();renderer.setSize(w,760,false);}}
+new ResizeObserver(resize).observe(host);
+function animate(){{controls.update();renderer.render(scene,camera);requestAnimationFrame(animate);}} animate();
+</script>
+"""
+st.subheader("🌲 Model 3D — nowy renderer")
+st.caption("Three.js: pełne bryły, naturalne światło i cienie. Obracaj myszką, rolką przybliżaj.")
+components.html(three_html,height=780,scrolling=False)
+
+with st.expander("Awaryjny podgląd Plotly (stary renderer)",expanded=False):
+    st.plotly_chart(fig,use_container_width=True)
+
 c1,c2=st.columns([4.5,1])
 with c1:
-    st.subheader("Model 3D")
-    st.plotly_chart(fig,use_container_width=True)
+    st.subheader("Parametry modelu 3D")
+    st.caption("Główny podgląd znajduje się powyżej w rendererze Three.js.")
 with c2:
     st.subheader("Parametry")
     if roof_type=="Jednospadowy":
@@ -339,5 +400,5 @@ project={"version":VERSION,"roof_type":roof_type,"ridge_height_m":ridge_h,"width
 "rafter_cm":[rw*100,rh*100],"rafter_spacing_m":spacing,"overhang_m":overhang,
 "braces":braces,"brace_length_m":brace_len,"wood_material":base_wood,"wood_finish":base_finish,"wood_detail":wood_detail,"style_overrides":st.session_state.style_overrides,"custom_elements":st.session_state.custom_elements}
 st.download_button("💾 Zapisz projekt",json.dumps(project,indent=2,ensure_ascii=False),
-                   "wiata-v0.10.json","application/json")
+                   "wiata-v1.0.json","application/json")
 st.warning("Model służy do projektowania geometrii i zestawienia materiału. Nie zastępuje obliczeń konstrukcyjnych.")
