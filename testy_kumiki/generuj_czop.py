@@ -83,19 +83,20 @@ def dump_object(label, obj):
 dump_object("SŁUP TIMBER PRZED JOINT", post)
 dump_object("BELKA TIMBER PRZED JOINT", beam)
 
-# Test kontrolny: eksport surowego słupa BEZ żadnego Joint.
-# Jeśli tu też wyjdzie 1000 mm, winny jest renderer/eksport CSG, a nie połączenie.
-RAW_OUT = OUT / "surowy_slup"
-RAW_OUT.mkdir(exist_ok=True)
-try:
-    raw_frame = k.Frame.from_timbers([post])
-    raw_files = k.export_frame_obj(raw_frame, RAW_OUT, local=False, combined=False)
-    print("\n=== SUROWY SŁUP BEZ JOINT ===")
-    for raw_path in raw_files:
-        print(" ", raw_path)
-except Exception as exc:
-    print("\n=== SUROWY SŁUP BEZ JOINT ===")
-    print("Frame.from_timbers niedostępne lub eksport nieudany:", type(exc).__name__, exc)
+# Następny test: sprawdzamy API Kumiki zamiast zgadywać konstruktor Frame.
+# Wypisujemy sygnatury klas/funkcji potrzebnych do utworzenia CutTimber bez Joint.
+import inspect
+print("\n=== API KUMIKI DO TESTU BEZ JOINT ===")
+for obj_name in ("CutTimber", "Frame"):
+    obj = getattr(k, obj_name, None)
+    print(f"{obj_name}: {obj!r}")
+    if obj is not None:
+        try:
+            print("  signature:", inspect.signature(obj))
+        except Exception as exc:
+            print("  signature niedostępna:", exc)
+        methods = [n for n in dir(obj) if not n.startswith("_") and any(w in n.lower() for w in ("timber", "cut", "frame", "joint"))]
+        print("  metody:", methods)
 
 print("TEST CENTROWANY: belka X=-800..+800 mm, słup kończy się w Z=2200 mm.")
 print("Węzeł: X=0, Y=0, Z=2200.")
