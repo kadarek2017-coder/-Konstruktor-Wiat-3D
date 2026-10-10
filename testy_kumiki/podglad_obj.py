@@ -830,15 +830,28 @@ document.getElementById('generate-carport').addEventListener('click',()=>{
   const {width:w,length:l,posts:n}=parsedCarport;
   if(group.children.length+n+4>500)throw new Error('Za dużo elementów w projekcie.');
   group.updateMatrixWorld(true);const origin=group.worldToLocal(controls.target.clone());const start=group.children.length;
-  carportPostPositions(w,l,n).forEach((p,k)=>addCarportMember(0,[h,200,200],origin.clone().add(new THREE.Vector3(p[0],p[1],h/2)),'Słup wiaty '+(k+1)));
-  addCarportMember(1,[w+200,140,200],origin.clone().add(new THREE.Vector3(0,-l/2,h+100)),'Belka wiaty przód');
-  addCarportMember(1,[w+200,140,200],origin.clone().add(new THREE.Vector3(0,l/2,h+100)),'Belka wiaty tył');
-  const a=addCarportMember(1,[l+200,140,200],origin.clone().add(new THREE.Vector3(-w/2,0,h+100)),'Belka wiaty lewa');
-  const b=addCarportMember(1,[l+200,140,200],origin.clone().add(new THREE.Vector3(w/2,0,h+100)),'Belka wiaty prawa');
+  const postPositions=carportPostPositions(w,l,n),postIndices=[];
+  postPositions.forEach((p,k)=>postIndices.push(addCarportMember(0,[h,200,200],origin.clone().add(new THREE.Vector3(p[0],p[1],h/2)),'Słup wiaty '+(k+1),{kind:'post',generator:'carport'})));
+  const front=addCarportMember(1,[w+200,140,200],origin.clone().add(new THREE.Vector3(0,-l/2,h+100)),'Belka wiaty przód',{kind:'perimeter_beam',side:'front',generator:'carport'});
+  const back=addCarportMember(1,[w+200,140,200],origin.clone().add(new THREE.Vector3(0,l/2,h+100)),'Belka wiaty tył',{kind:'perimeter_beam',side:'back',generator:'carport'});
+  const a=addCarportMember(1,[l+200,140,200],origin.clone().add(new THREE.Vector3(-w/2,0,h+100)),'Belka wiaty lewa',{kind:'perimeter_beam',side:'left',generator:'carport'});
+  const b=addCarportMember(1,[l+200,140,200],origin.clone().add(new THREE.Vector3(w/2,0,h+100)),'Belka wiaty prawa',{kind:'perimeter_beam',side:'right',generator:'carport'});
   group.children[a].rotation.z=Math.PI/2;group.children[b].rotation.z=Math.PI/2;
+  let autoJointCount=0;
+  if(document.getElementById('auto-joints').checked){
+   postPositions.forEach((p,k)=>{
+    const [x,y]=p,eps=1;
+    const candidates=[];
+    if(Math.abs(y+l/2)<eps)candidates.push(front);
+    if(Math.abs(y-l/2)<eps)candidates.push(back);
+    if(Math.abs(x+w/2)<eps)candidates.push(a);
+    if(Math.abs(x-w/2)<eps)candidates.push(b);
+    candidates.forEach(beamIndex=>{registerGeneratedJoint(postIndices[k],beamIndex,origin.clone().add(new THREE.Vector3(x,y,h)));autoJointCount++;});
+   });
+  }
   const roofParts=generateCarportRoof(origin,w,l,h,parsedCarport.roof,parsedCarport.angle);
   selectPart(start);fitAll();
-  document.getElementById('part-status').textContent='Wygenerowano wiatę '+w/1000+' x '+l/1000+' m: '+n+' słupów, 4 belki'+(roofParts?' i '+roofParts+' elementów dachu':'')+'. Wszystkie elementy można edytować.';
+  document.getElementById('part-status').textContent='Wygenerowano wiatę '+w/1000+' x '+l/1000+' m: '+n+' słupów, 4 belki'+(roofParts?' i '+roofParts+' elementów dachu':'')+(autoJointCount?' · rozpoznano '+autoJointCount+' węzłów czop–gniazdo':'')+'.';
  }catch(e){document.getElementById('part-status').textContent=e.message;}
 });
 
