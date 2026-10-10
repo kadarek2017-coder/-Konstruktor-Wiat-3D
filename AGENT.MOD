@@ -338,3 +338,16 @@ Dach jest generowany z osobnych edytowalnych elementów:
 - początkowy rozstaw krokwi geometrycznych około 800 mm.
 
 Rozstaw i przekroje są na tym etapie parametrami modelu geometrycznego, a nie wynikiem obliczeń konstrukcyjnych.
+
+
+## 43. Podgląd 3D na żywo z opisu — etap 3
+Wprowadzono automatyczny podgląd graficzny podczas pisania opisu wiaty.
+- parser uruchamia się automatycznie po krótkiej przerwie w pisaniu,
+- po uzyskaniu kompletu poprawnych parametrów powstaje tymczasowy model 3D,
+- zmiana tekstu zastępuje poprzedni podgląd zamiast dokładać kolejne konstrukcje,
+- podgląd obejmuje słupy, belki obwodowe oraz dach jedno- lub dwuspadowy,
+- zmiana wysokości aktualizuje podgląd,
+- podgląd można wyłączyć,
+- dopiero zatwierdzenie tworzy normalne edytowalne elementy projektu.
+
+Następny kierunek: wizualne oznaczenie wymiarów na podglądzie, formularz rozpoznanych parametrów oraz aktualizacja zatwierdzonej konstrukcji bez jej dublowania.
