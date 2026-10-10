@@ -48,7 +48,7 @@ def make_beam():
     # Belka pozioma 100 x 200 mm, 1600 mm długości.
     # Początek belki jest dokładnie na osi/górnym końcu słupa.\n    # To spełnia warunek Kumiki: koniec elementu z czopem dochodzi do boku belki.
     return k.create_axis_aligned_timber(
-        bottom_position=vec(0, 0, 2200),
+        bottom_position=vec(-800, 0, 2200),
         length=1600,
         size=vec(100, 200),
         length_direction=enum_member(k.TimberFace, "RIGHT", "Right"),
@@ -58,8 +58,8 @@ def make_beam():
 post = step("Tworzenie słupa 200×200 mm", make_post)
 beam = step("Tworzenie belki 100×200 mm", make_beam)
 
-print("Uwaga: wariant testowy wymaga sprawdzenia orientacji elementów.")
-print("Połączenie wymaga końca jednego elementu dochodzącego do boku drugiego.")
+print("TEST CENTROWANY: belka X=-800..+800 mm, słup kończy się w Z=2200 mm.")
+print("Węzeł: X=0, Y=0, Z=2200.")
 joint = step(
     "Wycięcie czopa i gniazda",
     lambda: k.cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(
