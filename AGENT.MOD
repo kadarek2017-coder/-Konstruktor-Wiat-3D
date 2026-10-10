@@ -297,11 +297,14 @@ Przed większą funkcją:
 Przed zmianą kodu sprawdzaj zgodność z tym plikiem. Gdy decyzja projektowa zmienia założenia produktu lub architektury, aktualizuj AGENT.MOD w tym samym etapie prac.
 
 ## 40. Aktualny najbliższy cel
-Dokończyć poprawny SelectionManager:
+SelectionManager — wdrożony etap 1:
 - pojedyncze zaznaczenie,
-- zaznaczenie dwóch i wielu elementów,
+- Shift/Ctrl/Cmd + klik dodaje lub usuwa element z zaznaczenia,
+- dwa zaznaczone elementy tworzą parę A/B,
 - czytelne podświetlenie,
-- stan zaznaczenia niezależny od renderera.
+- zaznaczenie wielokrotne jest przechowywane niezależnie od aktywnego elementu do edycji.
 
-Następnie:
-zaznaczenie dwóch elementów → rozpoznanie relacji → lista właściwych połączeń ciesielskich → parametryczny Joint → rzeczywiste cięcie widoczne w 3D.
+Następny etap:
+zaznaczenie dwóch elementów → automatyczne rozpoznanie ich typów, położenia, kąta i przecięcia → lista właściwych połączeń ciesielskich → parametryczny Joint → rzeczywiste cięcie widoczne w 3D.
+
+SelectionManager pozostaje do dalszego rozwinięcia o zaznaczanie prostokątem i operacje grupowe.
