@@ -351,3 +351,15 @@ Wprowadzono automatyczny podgląd graficzny podczas pisania opisu wiaty.
 - dopiero zatwierdzenie tworzy normalne edytowalne elementy projektu.
 
 Następny kierunek: wizualne oznaczenie wymiarów na podglądzie, formularz rozpoznanych parametrów oraz aktualizacja zatwierdzonej konstrukcji bez jej dublowania.
+
+
+## 44. Automatyczne węzły ciesielskie generatora — etap 4
+Generator wiaty potrafi rozpoznać styki słupów z belkami obwodowymi.
+- każdy słup i belka wygenerowana automatycznie otrzymuje metadane roli,
+- styki słup–belka są zapisywane jako węzły typu `czop_gniazdo`,
+- węzeł przechowuje indeks drugiego elementu i punkt połączenia XYZ,
+- dane połączeń są zapisywane w stanie projektu,
+- interfejs ma opcję „Automatyczne połączenia ciesielskie”,
+- etap ten tworzy trwałą relację konstrukcyjną; fizyczne seryjne wycinanie wszystkich wykrytych węzłów będzie następnym krokiem.
+
+Nie oznaczamy połączeń katalogowych jako wykonanych, dopóki nie istnieje rzeczywisty generator geometrii i kontrola kolizji.
