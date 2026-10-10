@@ -59,6 +59,30 @@ def make_beam():
 post = step("Tworzenie słupa 200×200 mm", make_post)
 beam = step("Tworzenie belki 100×200 mm", make_beam)
 
+# Diagnostyka obiektów Timber PRZED wykonaniem Joint.
+# Chcemy ustalić, czy długość 2200 mm ginie już podczas tworzenia Timber,
+# czy dopiero podczas operacji czopa i gniazda.
+def dump_object(label, obj):
+    print(f"\n=== {label} ===")
+    print("typ:", type(obj))
+    try:
+        attrs = vars(obj)
+    except TypeError:
+        attrs = {}
+    if attrs:
+        for key, value in attrs.items():
+            if any(word in key.lower() for word in ("length", "size", "position", "axis", "direction", "start", "end")):
+                print(f"  {key} = {value!r}")
+    for name in ("length", "size", "bottom_position", "top_position", "axis", "length_direction", "width_direction"):
+        try:
+            value = getattr(obj, name)
+        except Exception:
+            continue
+        print(f"  {name} = {value!r}")
+
+dump_object("SŁUP TIMBER PRZED JOINT", post)
+dump_object("BELKA TIMBER PRZED JOINT", beam)
+
 print("TEST CENTROWANY: belka X=-800..+800 mm, słup kończy się w Z=2200 mm.")
 print("Węzeł: X=0, Y=0, Z=2200.")
 joint = step(
