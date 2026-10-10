@@ -323,3 +323,18 @@ Wdrożono pierwszy generator tekst → parametry → edytowalny model 3D dla wia
 
 Dalszy rozwój generatora:
 typ dachu → spadek → krokwie/płatwie → edycja parametrów wygenerowanej wiaty → podgląd przed zatwierdzeniem → bardziej naturalne rozumienie polskich opisów.
+
+
+## 42. Generator dachu z opisu — etap 2
+Generator rozpoznaje dodatkowo:
+- dach dwuspadowy,
+- dach jednospadowy,
+- kąt podany w stopniach,
+- wysokość podaną w metrach lub milimetrach.
+
+Dach jest generowany z osobnych edytowalnych elementów:
+- dach dwuspadowy: kalenica + pary krokwi,
+- dach jednospadowy: równoległe krokwie ze spadkiem,
+- początkowy rozstaw krokwi geometrycznych około 800 mm.
+
+Rozstaw i przekroje są na tym etapie parametrami modelu geometrycznego, a nie wynikiem obliczeń konstrukcyjnych.
