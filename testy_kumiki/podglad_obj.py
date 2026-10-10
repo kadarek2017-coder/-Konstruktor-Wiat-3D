@@ -152,7 +152,7 @@ html = """
  </style>
  <div id="view" style="width:100%;height:100%"></div>
  <div style="position:absolute;left:14px;top:14px;background:rgba(255,255,255,.93);padding:10px 13px;border-radius:9px;font:14px -apple-system,BlinkMacSystemFont,sans-serif">
-  <b>Kumiki — rama i połączenia · wersja 16</b><br>
+  <b>Kumiki — rama i połączenia · wersja 16.1</b><br>
   Klik = jeden element · Shift/Ctrl/Cmd + klik = dodaj/usuń z zaznaczenia.<br>
   Dwa zaznaczone elementy automatycznie stają się parą A/B do połączenia.<br>
   Chwyć element bez klawisza modyfikującego, aby go przeciągnąć.<br>
@@ -783,7 +783,14 @@ function previewBeamBetween(a,b,materialIndex=1){
  const mesh=new THREE.Mesh(new THREE.BoxGeometry(len,80,160),mats[materialIndex].clone());
  mesh.position.copy(mid);mesh.rotation.order='ZYX';mesh.rotation.z=Math.atan2(d.y,d.x);mesh.rotation.y=-Math.atan2(d.z,Math.hypot(d.x,d.y));livePreviewGroup.add(mesh);
 }
+function hideExistingProjectForPreview(){
+ group.visible=false;dimensionLine.visible=false;transform.detach();
+}
+function showExistingProject(){
+ group.visible=true;
+}
 function drawLiveCarport(p){
+ hideExistingProjectForPreview();
  clearLiveCarport();const h=p.height||Number(document.getElementById('carport-height').value)||2800,w=p.width,l=p.length;
  carportPostPositions(w,l,p.posts).forEach(([x,y])=>{const m=new THREE.Mesh(new THREE.BoxGeometry(200,200,h),mats[0].clone());m.position.set(x,y,h/2);livePreviewGroup.add(m);});
  [[[-w/2,-l/2,h+100],[w/2,-l/2,h+100]], [[-w/2,l/2,h+100],[w/2,l/2,h+100]], [[-w/2,-l/2,h+100],[-w/2,l/2,h+100]], [[w/2,-l/2,h+100],[w/2,l/2,h+100]]].forEach(q=>previewBeamBetween(new THREE.Vector3(...q[0]),new THREE.Vector3(...q[1])));
@@ -803,11 +810,13 @@ document.getElementById('carport-prompt').addEventListener('input',()=>{
  },350);
 });
 document.getElementById('carport-height').addEventListener('input',()=>{if(parsedCarport&&document.getElementById('live-carport').checked){parsedCarport.height=Number(document.getElementById('carport-height').value);drawLiveCarport(parsedCarport);}});
-document.getElementById('live-carport').addEventListener('change',()=>{if(document.getElementById('live-carport').checked&&parsedCarport)drawLiveCarport(parsedCarport);else clearLiveCarport();});
+document.getElementById('live-carport').addEventListener('change',()=>{if(document.getElementById('live-carport').checked&&parsedCarport)drawLiveCarport(parsedCarport);else{clearLiveCarport();showExistingProject();fitAll();}});
 
 document.getElementById('generate-carport').addEventListener('click',()=>{
  try{
-  clearLiveCarport();
+  clearLiveCarport();showExistingProject();
+  // Generator zastępuje widok starego projektu nową konstrukcją.
+  group.children.forEach((part,i)=>{if(i<basePartCount)part.visible=false;});
   if(!parsedCarport)throw new Error('Najpierw odczytaj opis.');
   const h=Number(document.getElementById('carport-height').value);
   if(!Number.isFinite(h)||h<1800||h>6000)throw new Error('Wysokość: 1800–6000 mm.');
