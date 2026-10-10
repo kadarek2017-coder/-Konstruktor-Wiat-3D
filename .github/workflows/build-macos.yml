@@ -47,9 +47,9 @@ jobs:
 
       - name: Package
         run: |
-          ditto -c -k --sequesterRsrc --keepParent "dist/Konstruktor Wiat 3D.app" "Konstruktor-Wiat-3D-macOS.zip"
+          ditto -c -k --sequesterRsrc --keepParent "dist/Konstruktor Wiat 3D.app" "Konstruktor-Wiat-3D-v1.5-macOS.zip"
 
       - uses: actions/upload-artifact@v7
         with:
-          name: Konstruktor-Wiat-3D-macOS-v0.2-fixed
-          path: Konstruktor-Wiat-3D-macOS.zip
+          name: Konstruktor-Wiat-3D-v1.5-macOS
+          path: Konstruktor-Wiat-3D-v1.5-macOS.zip
