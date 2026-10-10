@@ -4,7 +4,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import plotly.graph_objects as go
 
-VERSION = "1.6.1"
+VERSION = "1.7"
 st.set_page_config(page_title=f"Konstruktor Wiat 3D v{VERSION}", page_icon="🏗️", layout="wide", initial_sidebar_state="collapsed")
 st.title(f"Konstruktor Wiat 3D v{VERSION}")
 st.caption("Parametryczny model drewnianej wiaty + ręczna biblioteka elementów 3D")
@@ -216,8 +216,18 @@ if is_wood:
 else:
     material="Stal/blacha" if element_type in ["Blacha dachowa","Stopa / kotwa"] else "Inny"
     finish="Fabryczne"
-if st.button("➕ Dodaj element do konstrukcji"):
-    st.session_state.custom_elements.append({"id":len(st.session_state.custom_elements)+1,"type":element_type,"x":ex,"y":ey,"z":ez,"a":ea,"b":eb,"length":elen,"direction":direction,"material":material,"finish":finish})
+st.markdown("#### 3. Dodaj")
+default_z=max(0.0,Hf-bh) if element_type in ["Belka","Krokiew","Płatew","Łata","Zastrzał","Blacha dachowa"] else 0.0
+if st.button("➕ DODAJ DO MODELU",type="primary",use_container_width=True):
+    next_id=max([int(e.get("id",0)) for e in st.session_state.custom_elements]+[0])+1
+    # Element pojawia się od razu w środku konstrukcji; nie trzeba najpierw znać współrzędnych.
+    px=max(0.0,min(float(W),float(ex)))
+    py=max(0.0,min(float(L),float(ey)))
+    pz=float(ez)
+    if abs(pz) < 1e-9 and default_z>0:
+        pz=default_z
+    st.session_state.custom_elements.append({"id":next_id,"type":element_type,"x":px,"y":py,"z":pz,"a":ea,"b":eb,"length":elen,"direction":direction or preset["dir"],"material":material,"finish":finish})
+    st.success(f"Dodano: {element_type} R{next_id}. Element jest już widoczny w modelu 3D.")
     st.rerun()
 if st.session_state.custom_elements:
     edited_custom=st.data_editor(pd.DataFrame(st.session_state.custom_elements),use_container_width=True,hide_index=True,
@@ -376,7 +386,7 @@ fig.update_layout(
 # Nowy renderer Three.js — pełne, nieprzezroczyste bryły z oświetleniem i cieniami
 three_data={"W":W,"L":L,"Hf":Hf,"Hb":Hb,"bh":bh,"bw":bw,"pc":pc,"rw":rw,"rh":rh,
             "posts":posts,"rafters":positions,"rafter_direction":rafter_direction,
-            "roof_type":roof_type,"ridge_h":ridge_h,"overhang":overhang,"wood":base_wood_color,"braces":braces,"brace_len":brace_len}
+            "roof_type":roof_type,"ridge_h":ridge_h,"overhang":overhang,"wood":base_wood_color,"braces":braces,"brace_len":brace_len,"custom_elements":st.session_state.custom_elements}
 three_json=json.dumps(three_data,ensure_ascii=False)
 three_html=f"""
 <div style="position:relative">
@@ -487,6 +497,17 @@ if(d.rafter_direction==='W poprzek (X)'){{
  }});
 }}
 
+// elementy dodane z graficznej biblioteki
+(d.custom_elements || []).forEach(el=>{{
+ const x=Number(el.x)||0, y=Number(el.y)||0, z=Number(el.z)||0;
+ const a=Math.max(Number(el.a)||.05,.01), b=Math.max(Number(el.b)||.05,.01);
+ const len=Math.max(Number(el.length)||.1,.01);
+ const label="R"+el.id;
+ if(el.direction==="X") addBox(x+len/2,y,z+b/2,len,a,b,wood,el.type,label,true);
+ else if(el.direction==="Y") addBox(x,y+len/2,z+b/2,a,len,b,wood,el.type,label,true);
+ else addBox(x,y,z+len/2,a,b,len,wood,el.type,label,true);
+}});
+
 // zaznaczanie elementów myszką
 const raycaster=new THREE.Raycaster(), pointer=new THREE.Vector2();
 let selected=null, selectedMaterial=null;
@@ -574,5 +595,5 @@ project={"version":VERSION,"roof_type":roof_type,"ridge_height_m":ridge_h,"width
 "rafter_cm":[rw*100,rh*100],"rafter_spacing_m":spacing,"overhang_m":overhang,
 "braces":braces,"brace_length_m":brace_len,"wood_material":base_wood,"wood_finish":base_finish,"wood_detail":wood_detail,"style_overrides":st.session_state.style_overrides,"custom_elements":st.session_state.custom_elements}
 st.download_button("💾 Zapisz projekt",json.dumps(project,indent=2,ensure_ascii=False),
-                   "wiata-v1.6.1.json","application/json")
+                   "wiata-v1.7.json","application/json")
 st.warning("Model służy do projektowania geometrii i zestawienia materiału. Nie zastępuje obliczeń konstrukcyjnych.")
