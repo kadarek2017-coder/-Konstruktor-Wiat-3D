@@ -67,33 +67,20 @@ joint = step(
     ),
 )
 
-print("Atrybuty Joint:", [x for x in dir(joint) if not x.startswith("_")])
-print("Liczba operacji joint.cuttings:", len(getattr(joint, "cuttings", [])))
-for i, cutting in enumerate(getattr(joint, "cuttings", []), 1):
-    print(f"  cutting {i}: {type(cutting).__name__}")
-    print("   atrybuty:", [x for x in dir(cutting) if not x.startswith("_")])
+print("Liczba elementów w Joint:", len(joint.cuttings))
+print("Nazwy elementów:", list(joint.cuttings.keys()))
 
-# Kumiki 0.8.0 zwraca Joint jako zestaw operacji cięcia.
-# Żeby nie zgadywać sposobu ich zastosowania, próbujemy oficjalnych helperów API,
-# a gdy ich brak — wypisujemy diagnostykę potrzebną do następnej poprawki.
-candidates = [
-    "cut_timbers_with_joints",
-    "cut_timbers",
-    "apply_joints",
-    "create_frame",
-    "frame_from_joints",
-]
-helper = next(((name, getattr(k, name)) for name in candidates if callable(getattr(k, name, None))), None)
-if helper is None:
-    print("DIAGNOSTYKA: brak oczywistego helpera stosującego Joint w głównym module.")
-    print("Funkcje Kumiki zawierające 'cut', 'joint' lub 'frame':")
-    print([x for x in dir(k) if any(word in x.lower() for word in ("cut", "joint", "frame"))])
-    print("Joint został utworzony poprawnie; potrzebujemy tylko właściwej ścieżki Joint → CutTimber → Frame.")
-    raise SystemExit(3)
+# Dokumentacja Kumiki: Frame.from_joints łączy operacje Cutting w CutTimber.
+frame = step("Złożenie Frame z Joint", lambda: k.Frame.from_joints([joint]))
+print("Liczba CutTimber:", len(frame.cut_timbers))
+if len(frame.cut_timbers) != 2:
+    print("UWAGA: oczekiwano dwóch elementów — sprawdź geometrię.")
 
-name, fn = helper
-print(f"Znaleziono helper API: {name}")
-import inspect
-print("Sygnatura:", inspect.signature(fn))
-print("Na tym etapie nie wywołuję go automatycznie bez potwierdzenia parametrów.")
-raise SystemExit(4)
+files = step(
+    "Eksport OBJ w globalnym układzie współrzędnych",
+    lambda: k.export_frame_obj(frame, OUT, local=False, combined=False),
+)
+print("Wygenerowane pliki:")
+for p in files:
+    print(" ", p)
+print("UWAGA: sprawdź wizualnie orientację i podcięcia przed użyciem w projekcie.")
