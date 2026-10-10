@@ -4,7 +4,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import plotly.graph_objects as go
 
-VERSION = "1.2"
+VERSION = "1.3"
 st.set_page_config(page_title=f"Konstruktor Wiat 3D v{VERSION}", page_icon="🏗️", layout="wide", initial_sidebar_state="collapsed")
 st.title(f"Konstruktor Wiat 3D v{VERSION}")
 st.caption("Parametryczny model drewnianej wiaty + ręczna biblioteka elementów 3D")
@@ -292,7 +292,12 @@ three_data={"W":W,"L":L,"Hf":Hf,"Hb":Hb,"bh":bh,"bw":bw,"pc":pc,"rw":rw,"rh":rh,
             "roof_type":roof_type,"ridge_h":ridge_h,"overhang":overhang,"wood":base_wood_color,"braces":braces,"brace_len":brace_len}
 three_json=json.dumps(three_data,ensure_ascii=False)
 three_html=f"""
+<div style="position:relative">
 <div id="three-view" style="width:100%;height:760px;border-radius:12px;overflow:hidden;background:#e8e4dc"></div>
+<div id="selection-info" style="position:absolute;left:14px;top:14px;background:rgba(255,255,255,.92);padding:10px 14px;border-radius:9px;font:14px -apple-system,BlinkMacSystemFont,sans-serif;box-shadow:0 2px 12px rgba(0,0,0,.14);pointer-events:none">
+<b>Model 3D</b><br>Kliknij drewniany element, aby go zaznaczyć.
+</div>
+</div>
 <script type="importmap">{{"imports":{{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"}}}}</script>
 <script type="module">
 import * as THREE from 'three';
@@ -314,9 +319,19 @@ const sun=new THREE.DirectionalLight(0xfff2d6,3.2); sun.position.set(-5,-7,10); 
 sun.shadow.mapSize.set(2048,2048); scene.add(sun);
 const wood=new THREE.MeshStandardMaterial({{color:d.wood,roughness:.78,metalness:0}});
 const groundMat=new THREE.MeshStandardMaterial({{color:0xb9b5aa,roughness:1}});
-function addBox(cx,cy,cz,sx,sy,sz,mat=wood){{
+const selectable=[];
+let elementCounter=0;
+function register(m,type,dims,label=null){{
+ m.userData.selectable=true; m.userData.type=type;
+ m.userData.label=label || type+" "+(++elementCounter);
+ m.userData.dims=dims;
+ selectable.push(m); return m;
+}}
+function addBox(cx,cy,cz,sx,sy,sz,mat=wood,type="Element",label=null,select=true){{
  const g=new THREE.BoxGeometry(Math.max(sx,.01),Math.max(sy,.01),Math.max(sz,.01));
- const m=new THREE.Mesh(g,mat); m.position.set(cx,cy,cz); m.castShadow=true; m.receiveShadow=true; scene.add(m); return m;
+ const m=new THREE.Mesh(g,mat); m.position.set(cx,cy,cz); m.castShadow=true; m.receiveShadow=true; scene.add(m);
+ if(select) register(m,type,{{width:sx,depth:sy,height:sz,length:Math.max(sx,sy,sz)}},label);
+ return m;
 }}
 function roofH(y,x){{
  if(d.roof_type==='Jednospadowy') return d.Hf+(d.Hb-d.Hf)*(y/d.L);
@@ -324,7 +339,7 @@ function roofH(y,x){{
  const half=d.W/2; return d.Hf+(d.ridge_h-d.Hf)*(1-Math.abs(x-half)/half);
 }}
 // Jedna belka = jedna ciągła bryła. BoxGeometry jest orientowane wzdłuż wektora p1->p2.
-function addMember(p1,p2,width,height,mat=wood){{
+function addMember(p1,p2,width,height,mat=wood,type="Belka",label=null){{
  const a=new THREE.Vector3(...p1), b=new THREE.Vector3(...p2);
  const dir=new THREE.Vector3().subVectors(b,a); const len=dir.length();
  if(len<0.0001) return null;
@@ -332,10 +347,12 @@ function addMember(p1,p2,width,height,mat=wood){{
  mesh.position.copy(a).add(b).multiplyScalar(.5);
  // lokalna oś Y bryły zostaje skierowana dokładnie wzdłuż elementu
  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir.clone().normalize());
- mesh.castShadow=true; mesh.receiveShadow=true; scene.add(mesh); return mesh;
+ mesh.castShadow=true; mesh.receiveShadow=true; scene.add(mesh);
+ register(mesh,type,{{width:width,height:height,length:len}},label);
+ return mesh;
 }}
-addBox(d.W/2,d.L/2,-.06,d.W+1,d.L+1,.12,groundMat);
-d.posts.forEach(p=>{{const x=p["X [m]"],y=p["Y [m]"],h=roofH(y,x)-d.bh; addBox(x,y,h/2,d.pc,d.pc,h);}});
+addBox(d.W/2,d.L/2,-.06,d.W+1,d.L+1,.12,groundMat,"Podłoże","Podłoże",false);
+d.posts.forEach((p,i)=>{{const x=p["X [m]"],y=p["Y [m]"],h=roofH(y,x)-d.bh; addBox(x,y,h/2,d.pc,d.pc,h,wood,"Słup","S"+(i+1));}});
 
 // belki podłużne — po jednej pełnej bryle na bok
 [0,d.W].forEach(x=>{{
@@ -382,6 +399,27 @@ if(d.rafter_direction==='W poprzek (X)'){{
    addMember([x,-d.overhang,z0],[x,d.L+d.overhang,z1],d.rw,d.rh);
  }});
 }}
+
+// zaznaczanie elementów myszką
+const raycaster=new THREE.Raycaster(), pointer=new THREE.Vector2();
+let selected=null, selectedMaterial=null;
+const highlight=new THREE.MeshStandardMaterial({color:0xf2b84b,roughness:.55,metalness:0});
+const info=document.getElementById('selection-info');
+renderer.domElement.addEventListener('pointerdown',ev=>{{
+ const r=renderer.domElement.getBoundingClientRect();
+ pointer.x=((ev.clientX-r.left)/r.width)*2-1;
+ pointer.y=-((ev.clientY-r.top)/r.height)*2+1;
+ raycaster.setFromCamera(pointer,camera);
+ const hit=raycaster.intersectObjects(selectable,false)[0];
+ if(selected) selected.material=selectedMaterial;
+ if(!hit){{selected=null; info.innerHTML="<b>Model 3D</b><br>Kliknij drewniany element, aby go zaznaczyć."; return;}}
+ selected=hit.object; selectedMaterial=selected.material; selected.material=highlight;
+ const u=selected.userData, q=u.dims || {{}};
+ const cm=v=>Math.round(v*100);
+ info.innerHTML="<b>"+u.label+"</b><br>"+u.type+
+   "<br>Przekrój: "+cm(q.width||0)+" × "+cm(q.height||0)+" cm"+
+   "<br>Długość: "+(q.length||0).toFixed(2)+" m";
+}});
 const grid=new THREE.GridHelper(Math.max(d.W,d.L)+2,Math.ceil(Math.max(d.W,d.L)+2),0x8f8a80,0xc7c1b6); grid.rotation.x=Math.PI/2; grid.position.z=.005; scene.add(grid);
 function resize(){{const w=host.clientWidth;camera.aspect=w/760;camera.updateProjectionMatrix();renderer.setSize(w,760,false);}}
 new ResizeObserver(resize).observe(host);
@@ -449,5 +487,5 @@ project={"version":VERSION,"roof_type":roof_type,"ridge_height_m":ridge_h,"width
 "rafter_cm":[rw*100,rh*100],"rafter_spacing_m":spacing,"overhang_m":overhang,
 "braces":braces,"brace_length_m":brace_len,"wood_material":base_wood,"wood_finish":base_finish,"wood_detail":wood_detail,"style_overrides":st.session_state.style_overrides,"custom_elements":st.session_state.custom_elements}
 st.download_button("💾 Zapisz projekt",json.dumps(project,indent=2,ensure_ascii=False),
-                   "wiata-v1.2.json","application/json")
+                   "wiata-v1.3.json","application/json")
 st.warning("Model służy do projektowania geometrii i zestawienia materiału. Nie zastępuje obliczeń konstrukcyjnych.")
