@@ -12,13 +12,13 @@ import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Podgląd Kumiki 3D", page_icon="🪚", layout="wide")
 st.title("🪚 Podgląd Kumiki 3D")
-st.caption("Rzeczywista geometria OBJ: słup 200×200 mm + belka 100×200 mm.")
+st.caption("Rzeczywista geometria OBJ po finite fix: słup 200×200 mm + belka 100×200 mm.")
 
 base = Path(__file__).resolve().parent / "wyniki"
 paths = [base / "SLUP_200x200.obj", base / "BELKA_100x200.obj"]
 missing = [p.name for p in paths if not p.exists()]
 if missing:
-    st.error("Brakuje: " + ", ".join(missing))
+    st.error("Brakuje poprawionych plików finite_joint: " + ", ".join(missing))
     st.code("python testy_kumiki/generuj_czop.py")
     st.stop()
 
