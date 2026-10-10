@@ -775,8 +775,39 @@ function generateCarportRoof(origin,w,l,h,roof,angle){
  return made;
 }
 
+
+const livePreviewGroup=new THREE.Group();scene.add(livePreviewGroup);
+function clearLiveCarport(){while(livePreviewGroup.children.length)livePreviewGroup.remove(livePreviewGroup.children[0]);}
+function previewBeamBetween(a,b,materialIndex=1){
+ const d=b.clone().sub(a),len=d.length(),mid=a.clone().add(b).multiplyScalar(.5);
+ const mesh=new THREE.Mesh(new THREE.BoxGeometry(len,80,160),mats[materialIndex].clone());
+ mesh.position.copy(mid);mesh.rotation.order='ZYX';mesh.rotation.z=Math.atan2(d.y,d.x);mesh.rotation.y=-Math.atan2(d.z,Math.hypot(d.x,d.y));livePreviewGroup.add(mesh);
+}
+function drawLiveCarport(p){
+ clearLiveCarport();const h=p.height||Number(document.getElementById('carport-height').value)||2800,w=p.width,l=p.length;
+ carportPostPositions(w,l,p.posts).forEach(([x,y])=>{const m=new THREE.Mesh(new THREE.BoxGeometry(200,200,h),mats[0].clone());m.position.set(x,y,h/2);livePreviewGroup.add(m);});
+ [[[-w/2,-l/2,h+100],[w/2,-l/2,h+100]], [[-w/2,l/2,h+100],[w/2,l/2,h+100]], [[-w/2,-l/2,h+100],[-w/2,l/2,h+100]], [[w/2,-l/2,h+100],[w/2,l/2,h+100]]].forEach(q=>previewBeamBetween(new THREE.Vector3(...q[0]),new THREE.Vector3(...q[1])));
+ const rad=p.angle*Math.PI/180,count=Math.max(2,Math.ceil(l/800)+1);
+ for(let i=0;i<count;i++){const y=-l/2+i*l/(count-1);
+  if(p.roof==='gable'){const rise=Math.tan(rad)*w/2,r=new THREE.Vector3(0,y,h+200+rise);previewBeamBetween(new THREE.Vector3(-w/2,y,h+200),r);previewBeamBetween(r,new THREE.Vector3(w/2,y,h+200));}
+  if(p.roof==='single'){const rise=Math.tan(rad)*w;previewBeamBetween(new THREE.Vector3(-w/2,y,h+200),new THREE.Vector3(w/2,y,h+200+rise));}
+ }
+ if(p.roof==='gable'){const rise=Math.tan(rad)*w/2;previewBeamBetween(new THREE.Vector3(0,-l/2,h+200+rise),new THREE.Vector3(0,l/2,h+200+rise));}
+ const box=new THREE.Box3().setFromObject(livePreviewGroup);if(!box.isEmpty()){livePreviewGroup.position.sub(box.getCenter(new THREE.Vector3()));}
+ fitAll();
+}
+let carportPreviewTimer=null;
+document.getElementById('carport-prompt').addEventListener('input',()=>{
+ clearTimeout(carportPreviewTimer);carportPreviewTimer=setTimeout(()=>{
+  if(updateCarportParse()&&document.getElementById('live-carport').checked)drawLiveCarport(parsedCarport);else clearLiveCarport();
+ },350);
+});
+document.getElementById('carport-height').addEventListener('input',()=>{if(parsedCarport&&document.getElementById('live-carport').checked){parsedCarport.height=Number(document.getElementById('carport-height').value);drawLiveCarport(parsedCarport);}});
+document.getElementById('live-carport').addEventListener('change',()=>{if(document.getElementById('live-carport').checked&&parsedCarport)drawLiveCarport(parsedCarport);else clearLiveCarport();});
+
 document.getElementById('generate-carport').addEventListener('click',()=>{
  try{
+  clearLiveCarport();
   if(!parsedCarport)throw new Error('Najpierw odczytaj opis.');
   const h=Number(document.getElementById('carport-height').value);
   if(!Number.isFinite(h)||h<1800||h>6000)throw new Error('Wysokość: 1800–6000 mm.');
