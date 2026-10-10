@@ -17,7 +17,7 @@ python -m streamlit run testy_kumiki/podglad_obj.py
 
 Jeśli środowisko już istnieje, zacznij od polecenia `source`.
 
-W podglądzie wersji 7 przycisk **Wygeneruj poprawiony model** uruchamia
+W podglądzie wersji 8 przycisk **Wygeneruj poprawiony model** uruchamia
 generator tym samym Pythonem co Streamlit i od razu wczytuje nowe pliki.
 Każde wyświetlenie sprawdza geometrię OBJ, w tym orientację przekroju
 czopa. Stary, błędny model jest blokowany, nawet jeśli pozostał po nim
@@ -88,6 +88,31 @@ projekt wykonawczy.
 python testy_kumiki/generuj_czop.py --skeleton
 python testy_kumiki/generuj_czop.py --skeleton --flat
 ```
+
+## Graficzny wybór i katalog części
+
+W wersji 8 panel po prawej zawiera graficzne kafelki wszystkich elementów
+modelu. Miniatury powstają z ich rzeczywistej siatki. Kliknij kafelek,
+aby zaznaczyć część (również ukrytą), potem chwyć ją w scenie i przeciągnij.
+Zaznaczenie jest widoczne na kafelku i na modelu; ukryte części mają
+przygaszony kafelek. Obie sekcje panelu można zwinąć.
+
+Katalog dodawania zawiera słup, belkę na sztorc, belkę płasko, miecz,
+krokiew i płatew. Przeciągnij kafelek do widoku 3D, aby umieścić nową
+część w miejscu upuszczenia, lub kliknij, aby dodać ją w środku widoku.
+Następnie przesuwaj część myszką lub polami X/Y/Z.
+
+Włącz **Użyj powyższych wymiarów**, aby zastosować własną długość,
+szerokość i wysokość przekroju. Wymiary są podane w milimetrach.
+Dla słupa i miecza długość biegnie wzdłuż elementu; miecz ma wstępny
+kąt 45°, a krokiew 12°. Katalog dostarcza pełne elementy bez wycięć.
+Nie dopasowuje automatycznie czopów i gniazd ani nie sprawdza kolizji
+nowych części. Źródłowe połączenia ram pozostają w geometrii OBJ.
+
+Nowe części można zaznaczać, ukrywać, przywracać i pobierać jako OBJ.
+Dodane części i wszystkie przesunięcia są tymczasowe: odświeżenie,
+generowanie lub przełączenie wariantu odtwarza bazowy model.
+Zapis i odczyt własnego układu będzie osobnym etapem.
 
 ## Jednostki i położenie
 
