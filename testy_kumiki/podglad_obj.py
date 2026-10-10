@@ -12,13 +12,13 @@ import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Podgląd Kumiki 3D", page_icon="🪚", layout="wide")
 st.title("🪚 Podgląd Kumiki 3D")
-st.caption("Rzeczywista geometria OBJ po finite fix: słup 200×200 mm + belka 100×200 mm.")
+st.caption("Czop i gniazdo: słup 200×200 mm + belka o szerokości 100 mm i wysokości 200 mm. Jednostki: mm.")
 
 base = Path(__file__).resolve().parent / "wyniki"
 paths = [base / "SLUP_200x200.obj", base / "BELKA_100x200.obj"]
 missing = [p.name for p in paths if not p.exists()]
 if missing:
-    st.error("Brakuje poprawionych plików finite_joint: " + ", ".join(missing))
+    st.error("Brakuje plików OBJ: " + ", ".join(missing))
     st.code("python testy_kumiki/generuj_czop.py")
     st.stop()
 
@@ -27,6 +27,18 @@ objs = [p.read_text(encoding="utf-8", errors="ignore") for p in paths]
 # Bezpieczne osadzenie w JS jako literały JSON.
 import json
 obj_json = json.dumps(objs)
+report_path = base / "wymiary.json"
+if not report_path.exists():
+    st.warning("Te modele pochodzą ze starszego eksportu. Wygeneruj je ponownie poprawionym skryptem.")
+    st.code("python testy_kumiki/generuj_czop.py")
+    st.stop()
+report = json.loads(report_path.read_text(encoding="utf-8"))
+st.caption("Oś belki: 2200 mm · spód belki i bark słupa: 2100 mm · koniec czopa: 2300 mm.")
+st.table([
+    {"Element": name, "X [mm]": round(part["size_mm"][0], 2),
+     "Y [mm]": round(part["size_mm"][1], 2), "Z [mm]": round(part["size_mm"][2], 2)}
+    for name, part in report["parts"].items()
+])
 
 html = """
 <div id="wrap" style="position:relative;width:100%;height:760px;border-radius:12px;overflow:hidden;background:#e9e5dd">
@@ -47,6 +59,7 @@ const host=document.getElementById('view');
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0xe9e5dd);
 const camera=new THREE.PerspectiveCamera(40,host.clientWidth/760,1,20000);
+camera.up.set(0,0,1);
 const renderer=new THREE.WebGLRenderer({antialias:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.setSize(host.clientWidth,760);

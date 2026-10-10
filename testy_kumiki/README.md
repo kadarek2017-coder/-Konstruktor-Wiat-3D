@@ -1,39 +1,53 @@
-# Próba integracji Kumiki — połączenia ciesielskie
+# Połączenie czop–gniazdo w Kumiki
 
-Ten folder jest **oddzielnym eksperymentem** i nie wpływa na uruchamianie Konstruktora Wiat 3D.
+Oddzielny podgląd geometrii; główna aplikacja wiaty nie korzysta jeszcze z tego węzła.
+Testowana wersja: Kumiki 0.8.0, Python 3.12.
 
-## Cel
+## Uruchomienie na Macu
 
-Wykonać rzeczywistą geometrię czopa i gniazda między słupem 200 × 200 mm
-a belką 100 × 200 mm i wyeksportować do OBJ, by później wyświetlić
-w Three.js. To **cel testu**, a nie funkcja już wdrożona.
-
-## Etap 1 — weryfikacja API
-
-Kumiki nie jest dodawane do głównego `requirements.txt`, żeby nie
-zepsuć istniejącej aplikacji ani procesu pakowania na macOS.
-
-W osobnym środowisku:
+W folderze repozytorium:
 
 ```bash
 python3 -m venv .venv-kumiki
 source .venv-kumiki/bin/activate
-python -m pip install kumiki
-python testy_kumiki/sprawdz_kumiki.py
+python -m pip install -r testy_kumiki/requirements.txt
+python testy_kumiki/generuj_czop.py
+python -m streamlit run testy_kumiki/podglad_obj.py
 ```
 
-Skrypt sprawdza, czy zainstalowana wersja udostępnia wymagane funkcje,
-i wypisuje ich sygnatury. **Nie generuje jeszcze modelu ani pliku OBJ**.
+Jeśli środowisko już istnieje, zacznij od polecenia `source`.
 
-## Etap 2 — do zrobienia po potwierdzeniu API
+## Jednostki i położenie
 
-- ustawić słup i belkę w odpowiedniej orientacji;
-- wywołać funkcję połączenia czop–gniazdo;
-- zbudować `Frame` i wyeksportować obie wycięte bryły do OBJ;
-- zweryfikować geometrię i jednostki;
-- przygotować import OBJ do Three.js i podgląd pojedynczego węzła.
+Kumiki otrzymuje wymiary w **metrach**, przez `k.mm(...)`.
+Eksport OBJ jest przeliczany na **milimetry** przed zapisaniem w `wyniki/`.
+Podgląd wczytuje te same zweryfikowane pliki. Nie korzysta z wcześniejszego
+katalogu eksperymentalnego `finite_joint` ani z modyfikacji prywatnych pól CSG.
 
-Wymiary czopa, gniazda i sprawdzenie nośności wymagają niezależnej
-weryfikacji projektowej. Sam model CAD nie jest projektem wykonawczym.
+- Słup: przekrój 200 × 200 mm, podstawa Z=0.
+- Belka: długość 1600 mm w osi X, szerokość 100 mm w osi Y,
+  wysokość 200 mm w osi Z.
+- Oś belki: Z=2200 mm. Jej spód i bark słupa: Z=2100 mm.
+- Koniec czopa: Z=2300 mm; to całkowita wysokość wyciętego słupa.
+  Nominalne `length=2200 mm` w tym teście określa położenie węzła,
+  a Kumiki przedłuża czop do góry belki.
 
-Dokumentacja: https://kumiki.build/docs/
+Poprzedni skrypt przekazywał milimetry jako metry. Przy nieskończonym końcu
+bryły triangulator stosował ograniczenie 1000 jednostek, przez co OBJ słupa
+kończył się przed węzłem. Przeliczenie jednostek usuwa przyczynę problemu.
+
+Eksport sprawdza wymiary, położenie, zamknięcie i ubytek objętości brył.
+`wymiary.json` zapisuje wynik kontroli. Podgląd pokazuje wymiary i używa
+pionowej osi Z. Wyniki i środowisko są pomijane przez Git.
+
+## Test regresji
+
+```bash
+python -m unittest testy_kumiki.test_geometria -v
+```
+
+Test odczytuje zapisane pliki OBJ, sprawdza ich wymiary i objętości po
+wycięciu oraz brak kolizji czopa z belką.
+
+Geometria służy do podglądu. Wymiary połączenia i nośność wymagają
+niezależnej weryfikacji projektowej przed wykonaniem konstrukcji.
