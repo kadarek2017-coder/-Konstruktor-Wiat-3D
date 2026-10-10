@@ -16,7 +16,7 @@ import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Podgląd Kumiki 3D", page_icon="🪚", layout="wide")
 st.title("🪚 Podgląd Kumiki 3D")
-st.caption("Wersja podglądu 10 — dokładne pozycjonowanie i baza połączeń")
+st.caption("Wersja podglądu 11 — dokładne pozycjonowanie i baza połączeń")
 
 app_dir = Path(__file__).resolve().parent
 base = app_dir / "wyniki"
@@ -152,7 +152,7 @@ html = """
  </style>
  <div id="view" style="width:100%;height:100%"></div>
  <div style="position:absolute;left:14px;top:14px;background:rgba(255,255,255,.93);padding:10px 13px;border-radius:9px;font:14px -apple-system,BlinkMacSystemFont,sans-serif">
-  <b>Kumiki — rama i połączenia · wersja 10</b><br>
+  <b>Kumiki — rama i połączenia · wersja 11</b><br>
   Wybierz kafelek lub chwyć element w widoku i przeciągnij.<br>
   Przeciąganie tła: obrót widoku · rolka: zoom · prawy: przesuwanie widoku
  </div>
@@ -186,8 +186,13 @@ html = """
    <label>Kategoria <select id="joint-filter"><option value="all">Wszystkie</option><option value="Ciesielskie">Ciesielskie</option><option value="Stolarskie">Stolarskie</option></select></label>
    <div id="joint-catalog" class="part-grid" style="margin-top:8px"></div>
    <p id="joint-info">Wybierz połączenie, aby zobaczyć opis i dostępność.</p>
+   <button id="set-joint-a" type="button">Zaznaczony → element A</button>
+   <button id="set-joint-b" type="button">Zaznaczony → element B</button>
+   <p id="joint-pair">A: brak · B: brak</p>
+   <button id="apply-joint" type="button" disabled>Wykonaj połączenie w A i B</button>
+   <p style="font-size:11px">Czop–gniazdo: A = słup, B = belka. Pół drewna: dwie prostopadłe belki. Najpierw ustaw części w miejscu styku. Czop przedłuża górę słupa do góry belki.</p>
    <button id="add-joint-example" type="button" disabled>Dodaj przykład z wycięciami</button>
-   <small>Przykłady dodają dwa nowe dopasowane elementy. Nie zmieniają wycięć dowolnej zaznaczonej pary.</small>
+   <small>Przykład dodaje nowe części. „Wykonaj połączenie” wycina w Twoich częściach A i B. Po przesunięciu wycięcia nie przeliczają się automatycznie.</small>
   </details>
   <details open><summary>Elementy w modelu</summary><div id="model-parts" class="part-grid"></div></details>
   <p id="model-counts" style="margin:8px 0"></p>
@@ -228,6 +233,7 @@ const labels = __LABELS__;
 const modelConfig = __MODEL__;
 const jointCatalog=__JOINTS__;
 const jointObjTexts=__EXAMPLES__;
+const restoredProject=__RESTORE__;
 const host=document.getElementById('view');
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0xe9e5dd);
@@ -356,6 +362,7 @@ document.getElementById('position-selected').addEventListener('click',()=>{
 });
 const partCards=[];
 const basePartCount=group.children.length;
+const baseOriginals=group.children.map(part=>part.clone());
 const baseLabels=labels.slice();
 function timberIcon(part){
  // Miniatura rzeczywistej siatki OBJ: rzut izometryczny, osobny od kamery sceny.
@@ -457,6 +464,13 @@ function addCatalogPart(type,event=null){
   document.getElementById('part-status').textContent='Dodano '+count+' szt.: '+catalog[type].label+'. Każdą część możesz przeciągnąć osobno.';
  }catch(error){document.getElementById('part-status').textContent=error.message;}
 }
+function meshPart(definition){
+ if(typeof definition.mesh!=='string'||definition.mesh.length>2000000)throw new Error('Nieprawidłowa geometria wyciętego elementu.');
+ const part=loader.parse(definition.mesh);
+ let hasMesh=false;part.traverse(o=>{if(o.isMesh){hasMesh=true;o.material=mats[0].clone();}});
+ if(!hasMesh)throw new Error('Brak geometrii wyciętego elementu.');
+ part.userData.definition=definition;return part;
+}
 function jointPart(jointId,member){
  const text=jointObjTexts[jointId]?.[member];if(!text)throw new Error('Nieznany przykład połączenia.');
  const part=loader.parse(text);
@@ -481,6 +495,27 @@ function jointDiagram(id){
  return '<svg viewBox="0 0 100 60" aria-hidden="true"><g fill="#d1a36a" stroke="#986b3d" stroke-width="1">'+(shapes[id]||'')+'</g></svg>';
 }
 let selectedJoint=null;
+let jointA=-1,jointB=-1;
+function syncPair(){
+ document.getElementById('joint-pair').textContent='A: '+(labels[jointA]||'brak')+' · B: '+(labels[jointB]||'brak');
+ document.getElementById('apply-joint').disabled=jointA<0||jointB<0||jointA===jointB||!selectedJoint||!jointObjTexts[selectedJoint.id];
+}
+for(const [id,role] of [['set-joint-a','a'],['set-joint-b','b']])document.getElementById(id).addEventListener('click',()=>{
+ if(!selected){document.getElementById('part-status').textContent='Najpierw zaznacz element w modelu.';return;}
+ if(role==='a')jointA=group.children.indexOf(selected);else jointB=group.children.indexOf(selected);
+ syncPair();
+});
+document.getElementById('apply-joint').addEventListener('click',()=>{
+ if(jointA<0||jointB<0||jointA===jointB||!selectedJoint)return;
+ const sources=[jointA,jointB].map(index=>{
+  const part=group.children[index].clone();part.updateMatrixWorld(true);return new OBJExporter().parse(part);
+ });
+ document.getElementById('apply-joint').disabled=true;
+ document.getElementById('part-status').textContent='Wycinanie i sprawdzanie połączenia…';
+ window.parent.postMessage({type:'kumiki:apply',request:{id:Date.now()+'-'+Math.random(),joint:selectedJoint.id,
+  indices:[jointA,jointB],base_count:basePartCount,state:projectState(),sources,
+  camera:{position:camera.position.toArray(),target:controls.target.toArray()}}},'*');
+});
 const jointCards=[];
 jointCatalog.forEach(entry=>{
  const card=document.createElement('button');card.type='button';card.className='part-card';
@@ -499,7 +534,7 @@ jointCatalog.forEach(entry=>{
   selectedJoint=entry;
   jointCards.forEach(({card,item})=>card.setAttribute('aria-pressed',String(item===entry)));
   document.getElementById('joint-info').textContent=entry.category+'. '+entry.description+' '+entry.parameters;
-  document.getElementById('add-joint-example').disabled=!jointObjTexts[entry.id];
+  document.getElementById('add-joint-example').disabled=!jointObjTexts[entry.id];syncPair();
  });
  document.getElementById('joint-catalog').appendChild(card);jointCards.push({card,item:entry});
 });
@@ -538,10 +573,13 @@ function fitAll(){
  camera.far=Math.max(20000,distance*4);camera.updateProjectionMatrix();controls.update();
 }
 document.getElementById('fit-all').addEventListener('click',fitAll);
-function saveProject(){
- const data={format:'kumiki-layout',version:1,model:modelConfig,
+function projectState(){
+ return {format:'kumiki-layout',version:1,model:modelConfig,
   parts:group.children.map((part,i)=>({label:labels[i],position:part.position.toArray(),home:part.userData.home.toArray(),visible:part.visible,
-   definition:part.userData.added?part.userData.definition:null}))};
+   definition:part.userData.definition||null}))};
+}
+function saveProject(){
+ const data=projectState();
  const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
  const link=document.createElement('a');link.href=url;link.download='projekt-wiaty.json';link.click();
  setTimeout(()=>URL.revokeObjectURL(url),1000);
@@ -555,21 +593,29 @@ function loadProject(data){
  const staged=data.parts.map((entry,i)=>{
   if(!entry||typeof entry.label!=='string'||entry.label.length>100||typeof entry.visible!=='boolean'||!vector(entry.position)||!vector(entry.home))throw new Error('Projekt zawiera błędne dane elementu.');
   if(i<basePartCount){
-   if(entry.label!==baseLabels[i]||entry.definition!==null||new THREE.Vector3(...entry.home).distanceTo(group.children[i].userData.home)>.001)throw new Error('Projekt nie pasuje do elementów bazowych.');
-   return null;
+   if(entry.label!==baseLabels[i]||new THREE.Vector3(...entry.home).distanceTo(group.children[i].userData.home)>.001)throw new Error('Projekt nie pasuje do elementów bazowych.');
+   if(entry.definition===null)return baseOriginals[i].clone();
+   if(entry.definition?.mesh)return meshPart(entry.definition);
+   throw new Error('Nieznana geometria bazowego elementu.');
   }
   const def=entry.definition;
+  if(def?.mesh)return meshPart(def);
   if(def&&typeof def.joint==='string'&&Number.isInteger(def.member)&&[0,1].includes(def.member))return jointPart(def.joint,def.member);
   if(!def||!Number.isInteger(def.type)||!catalog[def.type]||!Array.isArray(def.dimensions)||def.dimensions.length!==3||def.dimensions.some(n=>typeof n!=='number'))throw new Error('Projekt zawiera nieznany typ elementu.');
   return catalogPart(def.type,def.dimensions);
  });
- choose(-1);reference=null;document.getElementById('reference-name').textContent='Odniesienie: brak';
+ choose(-1);jointA=-1;jointB=-1;syncPair();reference=null;document.getElementById('reference-name').textContent='Odniesienie: brak';
  while(group.children.length>basePartCount){
   const part=group.children[group.children.length-1];group.remove(part);
   part.traverse(o=>{if(o.isMesh){o.geometry.dispose();o.material.dispose();}});
  }
  labels.length=basePartCount;
- staged.forEach((part,i)=>{if(part){group.add(part);labels.push(data.parts[i].label);part.userData.added=true;}});
+ staged.forEach((part,i)=>{if(part){
+  if(i<basePartCount){
+   const original=group.children[i];original.clear();
+   [...part.children].forEach(child=>original.add(child));original.userData.definition=data.parts[i].definition;
+  }else{group.add(part);labels.push(data.parts[i].label);part.userData.added=true;}
+ }});
  data.parts.forEach((entry,i)=>{
   const part=group.children[i];part.position.fromArray(entry.position);part.visible=entry.visible;
   if(i>=basePartCount)part.userData.home=new THREE.Vector3(...entry.home);
@@ -710,13 +756,36 @@ canvas.addEventListener('pointerup',finishPointer,true);
 canvas.addEventListener('pointercancel',finishPointer,true);
 canvas.addEventListener('lostpointercapture',finishPointer,true);
 syncInputs();
+if(restoredProject){
+ try{
+  loadProject(restoredProject.state);
+  if(restoredProject.indices){[jointA,jointB]=restoredProject.indices;choose(jointA);syncPair();}
+  if(restoredProject.camera){camera.position.fromArray(restoredProject.camera.position);controls.target.fromArray(restoredProject.camera.target);controls.update();}
+  document.getElementById('part-status').textContent=restoredProject.message;
+ }catch(error){document.getElementById('part-status').textContent=error.message;}
+}
 
 function resize(){const w=host.clientWidth;camera.aspect=w/760;camera.updateProjectionMatrix();renderer.setSize(w,760,false);}
 new ResizeObserver(resize).observe(host);
 function animate(){if(controls.enabled)controls.update();updateDimension();renderer.render(scene,camera);requestAnimationFrame(animate);}
 animate();
 </script>
-""".replace("__OBJS__", obj_json).replace("__LABELS__", json.dumps(labels, ensure_ascii=False)).replace("__JOINTS__", json.dumps(joint_catalog, ensure_ascii=False)).replace("__EXAMPLES__", json.dumps(joint_examples)).replace("__MODEL__", json.dumps({"beam_flat": beam_flat, "full_frame": full_frame, "skeleton": skeleton}))
+""".replace("__OBJS__", obj_json).replace("__LABELS__", json.dumps(labels, ensure_ascii=False)).replace("__RESTORE__", json.dumps(st.session_state.get("joint_response"))).replace("__JOINTS__", json.dumps(joint_catalog, ensure_ascii=False)).replace("__EXAMPLES__", json.dumps(joint_examples)).replace("__MODEL__", json.dumps({"beam_flat": beam_flat, "full_frame": full_frame, "skeleton": skeleton}))
 
-components.html(html,height=780,scrolling=False)
+editor_component = components.declare_component("kumiki_editor", path=str(app_dir / "frontend"))
+request = editor_component(html=html, key="kumiki_editor", default=None)
+if isinstance(request, dict) and request.get("id") != st.session_state.get("handled_joint_request"):
+    st.session_state["handled_joint_request"] = request.get("id")
+    try:
+        sys.path.insert(0, str(app_dir))
+        try:
+            from wykonaj_polaczenie import execute_request
+        finally:
+            sys.path.pop(0)
+        response = execute_request(request)
+    except Exception as exc:
+        response = {"state": request.get("state"), "indices": request.get("indices"),
+                    "camera": request.get("camera"), "message": "Połączenie nie zostało wykonane: " + str(exc)}
+    st.session_state["joint_response"] = response
+    st.rerun()
 st.info("Katalog dodaje pełne elementy bez wycięć. Zapisz projekt do JSON, aby zachować dodane części i ich położenie. Po odświeżeniu możesz go wczytać przy tych samych ustawieniach modelu. Przesuwanie i ukrywanie służy do oglądania połączeń. Pobieranie OBJ uwzględnia przesunięcie wybranego elementu. Odświeżenie widoku przywraca bazowy model; zapisany układ można wczytać z pliku JSON.")

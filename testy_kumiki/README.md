@@ -17,7 +17,7 @@ python -m streamlit run testy_kumiki/podglad_obj.py
 
 Jeśli środowisko już istnieje, zacznij od polecenia `source`.
 
-W podglądzie wersji 10 przycisk **Wygeneruj poprawiony model** uruchamia
+W podglądzie wersji 11 przycisk **Wygeneruj poprawiony model** uruchamia
 generator tym samym Pythonem co Streamlit i od razu wczytuje nowe pliki.
 Każde wyświetlenie sprawdza geometrię OBJ, w tym orientację przekroju
 czopa. Stary, błędny model jest blokowany, nawet jeśli pozostał po nim
@@ -91,7 +91,7 @@ python testy_kumiki/generuj_czop.py --skeleton --flat
 
 ## Graficzny wybór i katalog części
 
-W wersji 10 panel po prawej zawiera graficzne kafelki wszystkich elementów
+W wersji 11 panel po prawej zawiera graficzne kafelki wszystkich elementów
 modelu. Miniatury powstają z ich rzeczywistej siatki. Kliknij kafelek,
 aby zaznaczyć część (również ukrytą), potem chwyć ją w scenie i przeciągnij.
 Zaznaczenie jest widoczne na kafelku i na modelu; ukryte części mają
@@ -159,9 +159,36 @@ status **Katalog — bez generatora**; nie można dodawać ich wycięć.
 Czop–gniazdo korzysta ze sprawdzonego słupa 200×200 i belki 1600×100×200.
 Pół drewna ma dwie prostopadłe belki 1200×100×200 z wycięciem po połowie
 wysokości. Ich objętości, zamknięcie i brak kolizji są sprawdzane przed
-udostępnieniem. Parametry tych przykładów są stałe. Wersja 10 nie wycina
-jeszcze wybranego połączenia w dowolnej wskazanej parze, nie przelicza
-wycięć po przesunięciu ani nie ocenia nośności.
+udostępnieniem. Parametry tych przykładów są stałe. Wycięcia po przesunięciu nie przeliczają się automatycznie;
+program nie ocenia nośności.
+
+## Wykonanie połączenia we własnych elementach (wersja 11)
+
+1. Ustaw części w miejscu styku. Dla czopa zaznacz pionowy słup i kliknij
+   **Zaznaczony → element A**. Następnie zaznacz poziomą belkę i kliknij
+   **Zaznaczony → element B**.
+2. W bazie wybierz **Czop i gniazdo**, następnie **Wykonaj połączenie w A i B**.
+   Przycisk **Dodaj przykład** nadal tworzy nowe części; wykonanie zmienia A i B.
+3. Góra słupa musi dotykać spodu belki lub znajdować się w jej wysokości.
+   Słup musi być wycentrowany w szerokości belki. Wycięcie przedłuża czop
+   do góry belki, ustawia bark na spodzie belki i wykonuje gniazdo przelotowe.
+4. Dla **Pół drewna** wybierz dwie przecinające się, prostopadłe poziome
+   belki, o tej samej wysokości i poziomie. Wycięcia usuwają po połowie wysokości.
+5. Zapisz projekt — JSON zachowuje wycięte siatki, także w bazowych elementach.
+
+Obliczenia korzystają z rzeczywistych OBJ, wymiarów i pozycji wybranych
+części. Wcześniejsze otwory w belkach są zachowane. Wynik jest sprawdzany
+pod względem zamknięcia i kolizji przed zastąpieniem geometrii. Błędne
+ustawienie zostawia układ bez zmian i pokazuje przyczynę. Wycinanie korzysta
+z lokalnego komponentu Streamlit z folderu `frontend`; nie wysyła geometrii
+na zewnętrzny serwer.
+
+Pierwszy etap obsługuje osie X/Y/Z, belkę w X lub Y, bez ukośnych mieczy
+lub krokwi. Czop ma 75% szerokości słupa wzdłuż belki i 1/3 szerokości belki
+w poprzek. Luz montażowy oraz dowolne parametry czopa nie są jeszcze
+regulowane. Wycięcia pozostają w częściach po ich rozłączeniu i nie
+przeliczają się po zmianie położenia. Własne przeliczenia wykonuj ponownie
+na pełnych częściach, jeśli zmieniasz układ węzła.
 
 ## Jednostki i położenie
 
@@ -193,7 +220,7 @@ pionowej osi Z. Wyniki i środowisko są pomijane przez Git.
 ## Test regresji
 
 ```bash
-python -m unittest testy_kumiki.test_geometria testy_kumiki.test_polaczenia -v
+python -m unittest testy_kumiki.test_geometria testy_kumiki.test_polaczenia testy_kumiki.test_wykonaj_polaczenie -v
 ```
 
 Test odczytuje zapisane pliki OBJ, sprawdza ich wymiary i objętości po
