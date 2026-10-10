@@ -100,6 +100,26 @@ print("Nazwy elementów:", list(joint.cuttings.keys()))
 # Dokumentacja Kumiki: Frame.from_joints łączy operacje Cutting w CutTimber.
 frame = step("Złożenie Frame z Joint", lambda: k.Frame.from_joints([joint]))
 print("Liczba CutTimber:", len(frame.cut_timbers))
+
+print("\n=== CUTTIMBER PO JOINT ===")
+for i, ct in enumerate(frame.cut_timbers):
+    print(f"CutTimber #{i+1}: typ={type(ct)}")
+    try:
+        print("  vars =", vars(ct))
+    except Exception as exc:
+        print("  vars niedostępne:", exc)
+    for name in ("timber", "length", "size", "ticket", "cuttings", "base_timber"):
+        try:
+            value = getattr(ct, name)
+        except Exception:
+            continue
+        print(f"  {name} = {value!r}")
+        if name in ("timber", "base_timber"):
+            for sub in ("length", "size", "ticket"):
+                try:
+                    print(f"    {sub} = {getattr(value, sub)!r}")
+                except Exception:
+                    pass
 if len(frame.cut_timbers) != 2:
     print("UWAGA: oczekiwano dwóch elementów — sprawdź geometrię.")
 
