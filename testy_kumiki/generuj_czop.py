@@ -46,9 +46,9 @@ def make_post():
 
 def make_beam():
     # Belka pozioma 100 x 200 mm, 1600 mm długości.
-    # Pozycja belki dobrana poglądowo do próby styku ze słupem.
+    # Początek belki jest dokładnie na osi/górnym końcu słupa.\n    # To spełnia warunek Kumiki: koniec elementu z czopem dochodzi do boku belki.
     return k.create_axis_aligned_timber(
-        bottom_position=vec(-800, 0, 2200),
+        bottom_position=vec(0, 0, 2200),
         length=1600,
         size=vec(100, 200),
         length_direction=enum_member(k.TimberFace, "RIGHT", "Right"),
