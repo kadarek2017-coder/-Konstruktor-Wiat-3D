@@ -17,7 +17,7 @@ python -m streamlit run testy_kumiki/podglad_obj.py
 
 Jeśli środowisko już istnieje, zacznij od polecenia `source`.
 
-W podglądzie wersji 4 przycisk **Wygeneruj poprawiony model** uruchamia
+W podglądzie wersji 5 przycisk **Wygeneruj poprawiony model** uruchamia
 generator tym samym Pythonem co Streamlit i od razu wczytuje nowe pliki.
 Każde wyświetlenie sprawdza geometrię OBJ, w tym orientację przekroju
 czopa. Stary, błędny model jest blokowany, nawet jeśli pozostał po nim
@@ -36,6 +36,32 @@ Belkę płasko można wygenerować także poleceniem:
 
 ```bash
 python testy_kumiki/generuj_czop.py --flat
+```
+
+## Pełna rama i przesuwanie elementów
+
+Opcja **Pełna rama** tworzy dwa słupy 200 × 200 mm w rozstawie osiowym
+2400 mm i jedną belkę długości 3000 mm. Belka ma dwa rzeczywiste gniazda.
+Można ją ustawić na sztorc lub płasko. Podgląd jest dostępny także
+przez link **Rama z rzeczywistymi połączeniami** w głównej aplikacji.
+Ta strona wymaga osobnych zależności z tego folderu; rama pozostaje
+odrębnym modelem i nie zmienia jeszcze pełnej wiaty.
+
+- Kliknij słup lub belkę albo wybierz nazwę w polu **Element**.
+- Przeciągnij kolorową strzałkę X, Y lub Z, aby przesunąć wybrany element.
+- Pola X/Y/Z pokazują przesunięcie względem pozycji złożonej, w mm.
+- **Przywróć element** zeruje jego przesunięcie.
+- **Ukryj element** usuwa go z widoku. Ponowny wybór pokazuje go z powrotem.
+- **Złóż całą ramę** przywraca pozycje i widoczność wszystkich elementów.
+- **Pobierz element OBJ** zapisuje wybraną geometrię z aktualnym przesunięciem
+  w milimetrach, bez przesunięcia kamery używanego do centrowania widoku.
+
+Przesuwanie i ukrywanie nie zmienia źródłowych plików ani dopasowania
+połączeń. Odświeżenie widoku przywraca złożoną ramę.
+
+```bash
+python testy_kumiki/generuj_czop.py --frame
+python testy_kumiki/generuj_czop.py --frame --flat
 ```
 
 ## Jednostki i położenie

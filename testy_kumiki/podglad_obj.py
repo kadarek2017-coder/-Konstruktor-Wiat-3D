@@ -16,14 +16,15 @@ import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Podgląd Kumiki 3D", page_icon="🪚", layout="wide")
 st.title("🪚 Podgląd Kumiki 3D")
-st.caption("Wersja podglądu 4 — belka na sztorc lub płasko, rozsuwanie połączenia")
+st.caption("Wersja podglądu 5 — pełna rama, wybieranie i przeciąganie elementów")
 
 app_dir = Path(__file__).resolve().parent
 base = app_dir / "wyniki"
 try:
-    saved_flat = bool(json.loads((base / "wymiary.json").read_text(encoding="utf-8")).get("beam_flat", False))
+    saved_report = json.loads((base / "wymiary.json").read_text(encoding="utf-8"))
 except (OSError, ValueError):
-    saved_flat = False
+    saved_report = {}
+saved_flat = bool(saved_report.get("beam_flat", False))
 
 
 def request_generation():
@@ -34,15 +35,21 @@ beam_flat = st.checkbox(
     "Połóż belkę płasko — szerokość 200 mm, wysokość 100 mm",
     value=saved_flat, key="beam_flat", on_change=request_generation,
 )
+full_frame = st.checkbox(
+    "Pełna rama — dwa słupy i belka 3000 mm", value=bool(saved_report.get("full_frame", True)),
+    key="full_frame", on_change=request_generation,
+)
+if full_frame:
+    st.caption("Rozstaw osi słupów: 2400 mm · dwa czopy i dwa gniazda w jednej belce.")
 width, height = (200, 100) if beam_flat else (100, 200)
 st.caption(f"Słup 200×200 mm · belka: szerokość {width} mm, wysokość {height} mm. Zmiana ustawienia przelicza czop i gniazdo.")
 clicked_generate = st.button("Wygeneruj poprawiony model", type="primary")
 regenerate_requested = st.session_state.pop("regenerate_model", False)
-if clicked_generate or regenerate_requested:
+if clicked_generate or regenerate_requested or full_frame != saved_report.get("full_frame", False):
     with st.spinner("Generowanie i sprawdzanie czopa oraz gniazda…"):
         try:
             result = subprocess.run(
-                [sys.executable, str(app_dir / "generuj_czop.py")] + (["--flat"] if beam_flat else []),
+                [sys.executable, str(app_dir / "generuj_czop.py")] + (["--flat"] if beam_flat else []) + (["--frame"] if full_frame else []),
                 capture_output=True, text=True, timeout=60, check=False,
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
@@ -53,7 +60,9 @@ if clicked_generate or regenerate_requested:
         st.code(result.stderr or result.stdout)
         st.stop()
     st.success("Wygenerowano poprawiony model.")
-paths = [base / "SLUP_200x200.obj", base / "BELKA_100x200.obj"]
+names = (["SLUP_LEWY_200x200", "SLUP_PRAWY_200x200"] if full_frame else ["SLUP_200x200"]) + ["BELKA_100x200"]
+labels = (["Słup lewy", "Słup prawy"] if full_frame else ["Słup"]) + ["Belka"]
+paths = [base / f"{name}.obj" for name in names]
 missing = [p.name for p in paths if not p.exists()]
 if missing:
     st.error("Brakuje plików OBJ: " + ", ".join(missing))
@@ -76,7 +85,7 @@ try:
         sys.path.pop(0)
     meshes = {path.stem: trimesh.load_mesh(io.StringIO(obj), file_type="obj")
               for path, obj in zip(paths, objs)}
-    generuj_czop.validate_meshes(meshes, beam_flat=beam_flat)
+    generuj_czop.validate_meshes(meshes, beam_flat=beam_flat, full_frame=full_frame)
 except ImportError:
     st.error("Brakuje zależności do sprawdzenia i generowania modelu.")
     st.code("python -m pip install -r testy_kumiki/requirements.txt")
@@ -97,14 +106,25 @@ html = """
 <div id="wrap" style="position:relative;width:100%;height:760px;border-radius:12px;overflow:hidden;background:#e9e5dd">
  <div id="view" style="width:100%;height:100%"></div>
  <div style="position:absolute;left:14px;top:14px;background:rgba(255,255,255,.93);padding:10px 13px;border-radius:9px;font:14px -apple-system,BlinkMacSystemFont,sans-serif">
-  <b>Kumiki — czop i gniazdo · wersja 4</b><br>
-  Lewy przycisk: obrót · rolka: zoom · prawy: przesuwanie
+  <b>Kumiki — rama i połączenia · wersja 5</b><br>
+  Kliknij element, następnie przeciągnij kolorową strzałkę.<br>
+  Kliknięcie tła: obrót widoku · rolka: zoom · prawy: przesuwanie widoku
  </div>
  <div style="position:absolute;left:14px;right:14px;bottom:14px;background:rgba(255,255,255,.93);padding:12px;border-radius:9px;font:14px -apple-system,BlinkMacSystemFont,sans-serif">
   <label for="separation">Uniesienie belki: <output id="distance">0</output> mm</label>
   <input id="separation" type="range" min="0" max="500" step="5" value="0" style="width:100%;display:block;margin:8px 0">
   <button id="assemble" type="button">Złóż połączenie</button>
   <button id="separate" type="button">Rozsuń elementy</button>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px">
+   <label for="selected">Element:</label><select id="selected"><option value="-1">Wybierz element…</option></select>
+   <label>X <input id="move-x" type="number" value="0" step="10" style="width:75px"> mm</label>
+   <label>Y <input id="move-y" type="number" value="0" step="10" style="width:75px"> mm</label>
+   <label>Z <input id="move-z" type="number" value="0" step="10" style="width:75px"> mm</label>
+   <button id="reset-part" type="button">Przywróć element</button>
+   <button id="hide-part" type="button">Ukryj element</button>
+   <button id="reset-all" type="button">Złóż całą ramę</button>
+   <button id="download-part" type="button">Pobierz element OBJ</button>
+  </div>
  </div>
 </div>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"}}</script>
@@ -112,8 +132,11 @@ html = """
 import * as THREE from 'three';
 import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/controls/OrbitControls.js';
 import { OBJLoader } from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/loaders/OBJLoader.js';
+import { OBJExporter } from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/exporters/OBJExporter.js';
+import { TransformControls } from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/controls/TransformControls.js';
 
 const objTexts = __OBJS__;
+const labels = __LABELS__;
 const host=document.getElementById('view');
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0xe9e5dd);
@@ -140,9 +163,14 @@ const loader=new OBJLoader();
 const group=new THREE.Group(); scene.add(group);
 objTexts.forEach((txt,i)=>{
  const obj=loader.parse(txt);
+ const partCenter=new THREE.Box3().setFromObject(obj).getCenter(new THREE.Vector3());
  obj.traverse(o=>{
-   if(o.isMesh){o.material=mats[i];o.castShadow=true;o.receiveShadow=true;}
+   if(o.isMesh){
+    o.geometry.translate(-partCenter.x,-partCenter.y,-partCenter.z);
+    o.material=mats[i===objTexts.length-1?1:0].clone();o.castShadow=true;o.receiveShadow=true;
+   }
  });
+ obj.position.copy(partCenter);obj.userData.home=partCenter.clone();
  group.add(obj);
 });
 
@@ -163,22 +191,84 @@ controls.enableDamping=true; controls.target.set(0,0,0);
 const grid=new THREE.GridHelper(maxDim*2,20,0x8d887f,0xc5bfb5);
 grid.rotation.x=Math.PI/2; grid.position.z=-size.z/2; scene.add(grid);
 const separation=document.getElementById('separation');
+const beam=group.children[group.children.length-1];
 function setSeparation(value){
  separation.value=String(value);
- group.children[1].position.z=value;
+ beam.position.z=beam.userData.home.z+value;
  document.getElementById('distance').textContent=String(value);
+ syncInputs();
 }
 separation.addEventListener('input',()=>setSeparation(Number(separation.value)));
 document.getElementById('assemble').addEventListener('click',()=>setSeparation(0));
 document.getElementById('separate').addEventListener('click',()=>setSeparation(350));
+
+const transform=new TransformControls(camera,renderer.domElement);
+transform.setMode('translate');transform.setSpace('world');transform.setSize(.75);
+scene.add(transform.getHelper());
+transform.addEventListener('dragging-changed',event=>{controls.enabled=!event.value;});
+const select=document.getElementById('selected');
+labels.forEach((label,i)=>{const option=document.createElement('option');option.value=String(i);option.textContent=label;select.appendChild(option);});
+let selected=null;
+function syncInputs(){
+ for(const axis of ['x','y','z']){
+  const input=document.getElementById('move-'+axis);
+  input.disabled=!selected;
+  input.value=selected?String(Math.round(selected.position[axis]-selected.userData.home[axis])):'0';
+ }
+ for(const id of ['reset-part','hide-part','download-part'])document.getElementById(id).disabled=!selected;
+ const beamOffset=beam.position.z-beam.userData.home.z;
+ separation.value=String(Math.max(0,Math.min(500,beamOffset)));
+ document.getElementById('distance').textContent=String(Math.round(beamOffset));
+}
+function choose(index){
+ group.children.forEach(part=>part.traverse(o=>{if(o.isMesh)o.material.emissive.setHex(0x000000);}));
+ selected=index>=0?group.children[index]:null;
+ select.value=String(index);
+ if(selected){selected.visible=true;selected.traverse(o=>{if(o.isMesh)o.material.emissive.setHex(0x302010);});transform.attach(selected);}
+ else transform.detach();
+ syncInputs();
+}
+select.addEventListener('change',()=>choose(Number(select.value)));
+transform.addEventListener('objectChange',syncInputs);
+for(const axis of ['x','y','z'])document.getElementById('move-'+axis).addEventListener('change',event=>{
+ const value=Number(event.target.value);
+ if(selected&&Number.isFinite(value)){selected.position[axis]=selected.userData.home[axis]+value;syncInputs();}
+});
+document.getElementById('reset-part').addEventListener('click',()=>{if(selected){selected.position.copy(selected.userData.home);selected.visible=true;syncInputs();}});
+document.getElementById('hide-part').addEventListener('click',()=>{if(selected){selected.visible=false;choose(-1);}});
+document.getElementById('reset-all').addEventListener('click',()=>{
+ group.children.forEach(part=>{part.position.copy(part.userData.home);part.visible=true;});choose(-1);syncInputs();
+});
+document.getElementById('download-part').addEventListener('click',()=>{
+ if(!selected)return;
+ const exportPart=selected.clone();exportPart.updateMatrixWorld(true);
+ const text=new OBJExporter().parse(exportPart);
+ const url=URL.createObjectURL(new Blob([text],{type:'text/plain'}));
+ const link=document.createElement('a');link.href=url;link.download=labels[Number(select.value)].replaceAll(' ','_')+'.obj';link.click();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+});
+const raycaster=new THREE.Raycaster();
+let pointerStart=null;
+renderer.domElement.addEventListener('pointerdown',event=>{if(event.button===0)pointerStart=[event.clientX,event.clientY];});
+renderer.domElement.addEventListener('pointerup',event=>{
+ if(!pointerStart||event.button!==0)return;
+ const distance=Math.hypot(event.clientX-pointerStart[0],event.clientY-pointerStart[1]);pointerStart=null;
+ if(distance>5||transform.dragging||transform.axis!==null)return;
+ const rect=renderer.domElement.getBoundingClientRect();
+ raycaster.setFromCamera(new THREE.Vector2((event.clientX-rect.left)/rect.width*2-1,-(event.clientY-rect.top)/rect.height*2+1),camera);
+ const hit=raycaster.intersectObjects(group.children.filter(part=>part.visible),true)[0];
+ if(!hit){choose(-1);return;}
+ let part=hit.object;while(part.parent!==group)part=part.parent;
+ choose(group.children.indexOf(part));
+});
+syncInputs();
 
 function resize(){const w=host.clientWidth;camera.aspect=w/760;camera.updateProjectionMatrix();renderer.setSize(w,760,false);}
 new ResizeObserver(resize).observe(host);
 function animate(){controls.update();renderer.render(scene,camera);requestAnimationFrame(animate);}
 animate();
 </script>
-""".replace("__OBJS__", obj_json)
+""".replace("__OBJS__", obj_json).replace("__LABELS__", json.dumps(labels, ensure_ascii=False))
 
 components.html(html,height=780,scrolling=False)
-st.success("Wczytano oba pliki OBJ. Sprawdź, czy czop i gniazdo są widoczne oraz czy belka i słup są ustawione prawidłowo.")
-st.info("To jest ekran testowy. Nie zmienia jeszcze głównego modelu wiaty.")
+st.info("Przesuwanie i ukrywanie służy do oglądania połączeń. Pobieranie OBJ uwzględnia przesunięcie wybranego elementu. Odświeżenie widoku przywraca złożoną ramę.")

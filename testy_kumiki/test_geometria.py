@@ -6,7 +6,7 @@ import unittest
 import numpy as np
 import trimesh
 
-from testy_kumiki.generuj_czop import BEAM_NAME, POST_NAME, generate
+from testy_kumiki.generuj_czop import BEAM_NAME, POST_NAME, generate, validate_meshes
 
 
 class GeometryTests(unittest.TestCase):
@@ -54,6 +54,24 @@ class FlatGeometryTests(GeometryTests):
     width = 200
     bottom, top = 2150, 2250
     post_volume = 87_000_000
+
+
+class FullFrameTests(unittest.TestCase):
+    def test_two_post_frame_in_both_beam_orientations(self):
+        for flat in (False, True):
+            with self.subTest(flat=flat), TemporaryDirectory() as temporary:
+                output = Path(temporary)
+                generate(output, beam_flat=flat, full_frame=True)
+                meshes = {name: trimesh.load_mesh(output / f"{name}.obj")
+                          for name in ("SLUP_LEWY_200x200", "SLUP_PRAWY_200x200", BEAM_NAME)}
+                validate_meshes(meshes, beam_flat=flat, full_frame=True)
+                self.assertAlmostEqual(meshes[BEAM_NAME].volume, 58_000_000, delta=200)
+                self.assertEqual(len(meshes[BEAM_NAME].section(
+                    plane_origin=[0, 0, 2200], plane_normal=[0, 0, 1]
+                ).discrete), 3)
+                for name in ("SLUP_LEWY_200x200", "SLUP_PRAWY_200x200"):
+                    overlap = trimesh.boolean.intersection([meshes[name], meshes[BEAM_NAME]], engine="manifold")
+                    self.assertTrue(overlap.is_empty or abs(overlap.volume) < 0.1)
 
 
 if __name__ == "__main__":
