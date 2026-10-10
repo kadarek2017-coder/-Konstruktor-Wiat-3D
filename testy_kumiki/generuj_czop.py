@@ -109,6 +109,20 @@ raw_files = k.export_frame_obj(raw_frame, raw_dir, local=False, combined=False)
 print("\n=== SUROWY SŁUP 2200 BEZ JOINT ===")
 for p in raw_files:
     print(" ", p)
+    verts = []
+    with open(p, "r", encoding="utf-8", errors="ignore") as fh:
+        for line in fh:
+            if line.startswith("v "):
+                parts = line.split()
+                if len(parts) >= 4:
+                    verts.append(tuple(map(float, parts[1:4])))
+    if verts:
+        mn = tuple(min(v[i] for v in verts) for i in range(3))
+        mx = tuple(max(v[i] for v in verts) for i in range(3))
+        size = tuple(mx[i] - mn[i] for i in range(3))
+        print("  MIN    X,Y,Z =", mn)
+        print("  MAX    X,Y,Z =", mx)
+        print("  ROZMIAR X,Y,Z =", size)
 
 print("TEST CENTROWANY: belka X=-800..+800 mm, słup kończy się w Z=2200 mm.")
 print("Węzeł: X=0, Y=0, Z=2200.")
