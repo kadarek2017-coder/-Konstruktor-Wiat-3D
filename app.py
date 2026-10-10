@@ -4,7 +4,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import plotly.graph_objects as go
 
-VERSION = "1.8"
+VERSION = "1.9"
 st.set_page_config(page_title=f"Konstruktor Wiat 3D v{VERSION}", page_icon="🏗️", layout="wide", initial_sidebar_state="collapsed")
 st.title(f"Konstruktor Wiat 3D v{VERSION}")
 st.caption("Parametryczny model drewnianej wiaty + ręczna biblioteka elementów 3D")
@@ -55,29 +55,47 @@ with st.sidebar:
     base_wood_color=FINISH_COLORS.get(base_finish) or WOOD_COLORS[base_wood]
     st.caption("Domyślny wygląd całej konstrukcji. Wybrane elementy można nadpisać niżej.")
 
-st.subheader("🪚 Połączenia ciesielskie")
-st.caption("Wybierz sposób połączenia. Model pokazuje je poglądowo w 3D; dobór nośności i wymiarów węzła wymaga osobnego sprawdzenia konstrukcyjnego.")
-j1,j2,j3=st.columns(3)
-with j1:
-    st.session_state.joinery["post_beam"]=st.selectbox(
-        "Słup ↔ belka",
-        ["Czop i gniazdo","Nakładka / pół-drewna","Śruby przelotowe","Łącznik stalowy"],
-        index=["Czop i gniazdo","Nakładka / pół-drewna","Śruby przelotowe","Łącznik stalowy"].index(st.session_state.joinery.get("post_beam","Czop i gniazdo"))
-    )
-with j2:
-    st.session_state.joinery["rafter_beam"]=st.selectbox(
-        "Krokiew ↔ belka",
-        ["Wrąb krokwiowy","Nakładka / pół-drewna","Wkręty ciesielskie","Łącznik stalowy"],
-        index=["Wrąb krokwiowy","Nakładka / pół-drewna","Wkręty ciesielskie","Łącznik stalowy"].index(st.session_state.joinery.get("rafter_beam","Wrąb krokwiowy"))
-    )
-with j3:
-    st.session_state.joinery["brace"]=st.selectbox(
-        "Zastrzał ↔ słup/belka",
-        ["Czop i gniazdo","Nakładka / pół-drewna","Śruby przelotowe"],
-        index=["Czop i gniazdo","Nakładka / pół-drewna","Śruby przelotowe"].index(st.session_state.joinery.get("brace","Czop i gniazdo"))
-    )
-st.session_state.joinery["show"]=st.checkbox("Pokaż detale połączeń w modelu 3D",value=bool(st.session_state.joinery.get("show",True)))
-st.info("Połączenia są wizualizacją projektu. Program nie traktuje jeszcze wybranego węzła jako obliczenia konstrukcyjnego.")
+st.subheader("🪚 Graficzne połączenia ciesielskie")
+st.caption("Kliknij rysunek połączenia. Miniatura pokazuje sposób zetknięcia drewna lub użyty łącznik.")
+
+def joinery_thumbnail(name,active=False):
+    border="#b7793f" if active else "#d9d1c7"
+    bg="#f7efe5" if active else "#faf9f7"
+    wood="#c89560"; dark="#9a673c"; cut="#e5bd8d"; steel="#697077"
+    if name=="Czop i gniazdo":
+        art=f'<rect x="15" y="50" width="90" height="24" rx="2" fill="{wood}" stroke="{dark}" stroke-width="2"/><rect x="48" y="13" width="24" height="48" fill="{cut}" stroke="{dark}" stroke-width="2"/><rect x="53" y="48" width="14" height="17" fill="{dark}" opacity=".55"/><path d="M48 50 L53 44 L67 44 L72 50" fill="{cut}" stroke="{dark}" stroke-width="2"/>'
+    elif name=="Nakładka / pół-drewna":
+        art=f'<polygon points="10,55 63,35 76,43 23,64" fill="{wood}" stroke="{dark}" stroke-width="2"/><polygon points="48,21 105,53 94,63 38,31" fill="{cut}" stroke="{dark}" stroke-width="2"/><rect x="49" y="39" width="25" height="17" fill="{dark}" opacity=".35"/>'
+    elif name=="Wrąb krokwiowy":
+        art=f'<rect x="13" y="61" width="94" height="18" rx="2" fill="{wood}" stroke="{dark}" stroke-width="2"/><polygon points="24,55 94,18 103,29 69,47 64,61 43,61" fill="{cut}" stroke="{dark}" stroke-width="2"/><path d="M64 61 L69 47 L82 40" fill="none" stroke="{dark}" stroke-width="3"/>'
+    elif name in ("Śruby przelotowe","Wkręty ciesielskie"):
+        art=f'<rect x="13" y="51" width="94" height="24" rx="2" fill="{wood}" stroke="{dark}" stroke-width="2"/><rect x="49" y="15" width="25" height="63" fill="{cut}" stroke="{dark}" stroke-width="2"/><line x1="38" y1="43" x2="87" y2="43" stroke="{steel}" stroke-width="5"/><circle cx="38" cy="43" r="6" fill="{steel}"/><circle cx="87" cy="43" r="6" fill="{steel}"/>'
+    else:
+        art=f'<rect x="13" y="54" width="94" height="23" rx="2" fill="{wood}" stroke="{dark}" stroke-width="2"/><rect x="48" y="14" width="25" height="63" fill="{cut}" stroke="{dark}" stroke-width="2"/><path d="M43 45 L78 45 L78 72 L70 72 L70 53 L51 53 L51 72 L43 72 Z" fill="{steel}" stroke="#4e555b" stroke-width="2"/><circle cx="48" cy="49" r="3" fill="#ddd"/><circle cx="73" cy="49" r="3" fill="#ddd"/>'
+    return f"""<div style="height:128px;border:2px solid {border};border-radius:12px;background:{bg};padding:5px;text-align:center">
+    <svg viewBox="0 0 120 90" width="100%" height="88" role="img" aria-label="{name}">{art}</svg>
+    <div style="font-size:13px;font-weight:700;margin-top:-2px">{name}</div></div>"""
+
+def graphical_joinery_picker(title,key,options):
+    st.markdown(f"**{title}**")
+    cols=st.columns(len(options))
+    for col,name in zip(cols,options):
+        with col:
+            active=st.session_state.joinery.get(key)==name
+            st.markdown(joinery_thumbnail(name,active),unsafe_allow_html=True)
+            if st.button(("✓ " if active else "")+"Wybierz",key=f"join_{key}_{name}",use_container_width=True):
+                st.session_state.joinery[key]=name
+                st.rerun()
+
+graphical_joinery_picker("Słup ↔ belka","post_beam",
+    ["Czop i gniazdo","Nakładka / pół-drewna","Śruby przelotowe","Łącznik stalowy"])
+graphical_joinery_picker("Krokiew ↔ belka","rafter_beam",
+    ["Wrąb krokwiowy","Nakładka / pół-drewna","Wkręty ciesielskie","Łącznik stalowy"])
+graphical_joinery_picker("Zastrzał ↔ słup / belka","brace",
+    ["Czop i gniazdo","Nakładka / pół-drewna","Śruby przelotowe"])
+
+st.session_state.joinery["show"]=st.checkbox("Pokaż wybrane połączenia w modelu 3D",value=bool(st.session_state.joinery.get("show",True)))
+st.caption("Miniatury i model 3D pokazują geometrię poglądowo. Wymiary i nośność konkretnego węzła trzeba sprawdzić konstrukcyjnie.")
 
 # Edycja wyglądu pojedynczych elementów i grup
 with st.expander("🎨 Kolorowanie elementów / grup", expanded=False):
@@ -655,5 +673,5 @@ project={"version":VERSION,"roof_type":roof_type,"ridge_height_m":ridge_h,"width
 "rafter_cm":[rw*100,rh*100],"rafter_spacing_m":spacing,"overhang_m":overhang,
 "braces":braces,"brace_length_m":brace_len,"wood_material":base_wood,"wood_finish":base_finish,"wood_detail":wood_detail,"style_overrides":st.session_state.style_overrides,"custom_elements":st.session_state.custom_elements}
 st.download_button("💾 Zapisz projekt",json.dumps(project,indent=2,ensure_ascii=False),
-                   "wiata-v1.8.json","application/json")
+                   "wiata-v1.9.json","application/json")
 st.warning("Model służy do projektowania geometrii i zestawienia materiału. Nie zastępuje obliczeń konstrukcyjnych.")
