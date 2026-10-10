@@ -17,11 +17,26 @@ python -m streamlit run testy_kumiki/podglad_obj.py
 
 Jeśli środowisko już istnieje, zacznij od polecenia `source`.
 
-W podglądzie wersji 3 przycisk **Wygeneruj poprawiony model** uruchamia
+W podglądzie wersji 4 przycisk **Wygeneruj poprawiony model** uruchamia
 generator tym samym Pythonem co Streamlit i od razu wczytuje nowe pliki.
 Każde wyświetlenie sprawdza geometrię OBJ, w tym orientację przekroju
 czopa. Stary, błędny model jest blokowany, nawet jeśli pozostał po nim
 plik `wymiary.json`. Tabela wymiarów pochodzi bezpośrednio z OBJ.
+
+Pole **Połóż belkę płasko** przełącza przekrój między szerokością 100 mm
+i wysokością 200 mm a szerokością 200 mm i wysokością 100 mm. Zmiana
+automatycznie generuje dopasowany czop i gniazdo. Oś belki pozostaje na
+Z=2200 mm; płaska belka ma spód na 2150 mm, a koniec czopa na 2250 mm.
+Czop ma wtedy 150 × 66,67 mm i długość 100 mm.
+
+Suwak **Uniesienie belki** w widoku 3D przesuwa belkę o 0–500 mm w osi Z.
+**Rozsuń elementy** ustawia 350 mm, a **Złóż połączenie** przywraca 0 mm.
+Rozsuwanie służy do oglądania czopa i gniazda; nie zmienia plików OBJ.
+Belkę płasko można wygenerować także poleceniem:
+
+```bash
+python testy_kumiki/generuj_czop.py --flat
+```
 
 ## Jednostki i położenie
 
