@@ -41,6 +41,7 @@ def make_post():
         length=2200,
         size=vec(200, 200),
         length_direction=enum_member(k.TimberFace, "TOP", "Top"),
+        ticket="SLUP_200x200",
     )
 
 def make_beam():
@@ -51,6 +52,7 @@ def make_beam():
         length=1600,
         size=vec(100, 200),
         length_direction=enum_member(k.TimberFace, "RIGHT", "Right"),
+        ticket="BELKA_100x200",
     )
 
 post = step("Tworzenie słupa 200×200 mm", make_post)
