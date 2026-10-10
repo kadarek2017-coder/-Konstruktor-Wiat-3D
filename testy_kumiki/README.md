@@ -31,6 +31,10 @@ katalogu eksperymentalnego `finite_joint` ani z modyfikacji prywatnych pól CSG.
 - Koniec czopa: Z=2300 mm; to całkowita wysokość wyciętego słupa.
   Nominalne `length=2200 mm` w tym teście określa położenie węzła,
   a Kumiki przedłuża czop do góry belki.
+- Czop ma 150 mm w osi X (wzdłuż belki) i 33,33 mm w osi Y.
+  Gniazdo pozostawia pełne ścianki po obu stronach szerokości belki.
+  Wymiary są przekazywane jawnie, ponieważ automatyczny wrapper Kumiki
+  zamieniał osie czopa i otwierał gniazdo na boki belki.
 
 Poprzedni skrypt przekazywał milimetry jako metry. Przy nieskończonym końcu
 bryły triangulator stosował ograniczenie 1000 jednostek, przez co OBJ słupa
@@ -47,7 +51,8 @@ python -m unittest testy_kumiki.test_geometria -v
 ```
 
 Test odczytuje zapisane pliki OBJ, sprawdza ich wymiary i objętości po
-wycięciu oraz brak kolizji czopa z belką.
+wycięciu, brak kolizji, orientację przekroju czopa oraz zamknięty obrys
+gniazda na poziomie osi belki.
 
 Geometria służy do podglądu. Wymiary połączenia i nośność wymagają
 niezależnej weryfikacji projektowej przed wykonaniem konstrukcji.

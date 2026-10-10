@@ -31,8 +31,15 @@ def build_frame():
         size=metres_vector(100, 200), length_direction=k.TimberFace.RIGHT,
         width_direction=k.TimberFace.FRONT, ticket=BEAM_NAME,
     )
-    joint = k.cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(
-        tenon_timber=post, mortise_timber=beam, tenon_end=k.TimberEnd.TOP,
+    # Jawne osie przekroju czopa: X wzdłuż belki, Y w jej szerokości.
+    # Automatyczny wrapper Kumiki odwracał te wymiary dla tej orientacji.
+    joint = k.cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+        arrangement=k.ButtJointTimberArrangement(
+            butt_timber=post, receiving_timber=beam, butt_timber_end=k.TimberEnd.TOP,
+        ),
+        tenon_width_relative_to_joint=k.mm(150),
+        tenon_height_relative_to_joint=k.mm(100 / 3),
+        tenon_length=k.mm(200), mortise_depth=k.mm(200),
     )
     return k.Frame.from_joints([joint])
 
@@ -54,6 +61,11 @@ def validate_meshes(meshes):
         raise ValueError("Belka nie ma wyciętego gniazda.")
     if not 200 * 200 * 2100 < meshes[POST_NAME].volume < 200 * 200 * 2300:
         raise ValueError("Słup nie ma prawidłowo wyciętych barków czopa.")
+    section = meshes[POST_NAME].section(plane_origin=[0, 0, 2200], plane_normal=[0, 0, 1])
+    if section is None or not np.allclose(
+        section.bounds[:, :2], [[-75, -100 / 6], [75, 100 / 6]], atol=0.05, rtol=0
+    ):
+        raise ValueError("Czop ma błędną orientację lub wystaje poza szerokość belki.")
 
 
 def generate(output_dir=OUT):

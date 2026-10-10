@@ -27,7 +27,17 @@ class GeometryTests(unittest.TestCase):
         self.assertTrue(self.post.is_volume)
         self.assertTrue(self.beam.is_volume)
         self.assertAlmostEqual(self.post.volume, 85_000_000, delta=100)
-        self.assertAlmostEqual(self.beam.volume, 31_333_333.333, delta=100)
+        self.assertAlmostEqual(self.beam.volume, 31_000_000, delta=100)
+
+    def test_tenon_is_inside_beam_width_and_has_closed_mortise(self):
+        section = self.post.section(plane_origin=[0, 0, 2200], plane_normal=[0, 0, 1])
+        np.testing.assert_allclose(section.bounds[:, :2],
+                                   [[-75, -100 / 6], [75, 100 / 6]], atol=0.05)
+        beam_section = self.beam.section(plane_origin=[0, 0, 2200], plane_normal=[0, 0, 1])
+        # Zewnętrzny obrys i osobny zamknięty obrys gniazda.
+        self.assertEqual(len(beam_section.discrete), 2)
+        widths = sorted(np.ptp(loop[:, 1]) for loop in beam_section.discrete)
+        np.testing.assert_allclose(widths, [100 / 3, 100], atol=0.05)
 
     def test_tenon_and_mortise_have_no_collision(self):
         overlap = trimesh.boolean.intersection([self.post, self.beam], engine="manifold")
