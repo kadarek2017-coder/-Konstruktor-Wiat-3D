@@ -725,11 +725,18 @@ function addCarportMember(type,dims,pos,label){
  part.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
  group.add(part);labels.push(label);const i=group.children.length-1;if(catalog[type].label.startsWith('Belka'))beams.push(part);registerPart(i);return i;
 }
-document.getElementById('parse-carport').addEventListener('click',()=>{
- try{parsedCarport=parseCarport(document.getElementById('carport-prompt').value);if(parsedCarport.height)document.getElementById('carport-height').value=String(parsedCarport.height);const roofName=parsedCarport.roof==='gable'?'dach dwuspadowy':parsedCarport.roof==='single'?'dach jednospadowy':'bez automatycznego dachu';document.getElementById('carport-preview').textContent='Odczytano: '+parsedCarport.width/1000+' x '+parsedCarport.length/1000+' m · '+parsedCarport.posts+' słupów · '+roofName+(parsedCarport.roof!=='none'?' '+parsedCarport.angle+'°':'')+'.';document.getElementById('generate-carport').disabled=false;}
- catch(e){parsedCarport=null;document.getElementById('generate-carport').disabled=true;document.getElementById('carport-preview').textContent=e.message;}
-});
-
+function updateCarportParse(){
+ try{
+  parsedCarport=parseCarport(document.getElementById('carport-prompt').value);
+  if(parsedCarport.height)document.getElementById('carport-height').value=String(parsedCarport.height);
+  const roofName=parsedCarport.roof==='gable'?'dach dwuspadowy':parsedCarport.roof==='single'?'dach jednospadowy':'bez automatycznego dachu';
+  document.getElementById('carport-preview').textContent='Podgląd: '+parsedCarport.width/1000+' x '+parsedCarport.length/1000+' m · '+parsedCarport.posts+' słupów · '+roofName+(parsedCarport.roof!=='none'?' '+parsedCarport.angle+'°':'')+'.';
+  document.getElementById('generate-carport').disabled=false;return true;
+ }catch(e){
+  parsedCarport=null;document.getElementById('generate-carport').disabled=true;
+  document.getElementById('carport-preview').textContent=e.message;return false;
+ }
+}
 
 
 function addRoofMemberBetween(a,b,label){
